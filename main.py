@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from helpers import gen_patients, initialize_dose_label, get_toxicity
-from c3t_budget import run_C3T_Budget, run_C3T_Budget_all
+from c3t_budget import run_C3T_Budget, run_C3T_Budget_all, run_C3T, run_C3T_with_gradient_temp, run_C3T_Budget_all_with_gradient
 
 
 np.random.seed(0)
@@ -126,7 +126,7 @@ def plot_dose_toxicity_curve_with_skeleton(dose_labels, p_true, a_hat_fin, p_emp
 
 
 def main():
-    reps = 200 # num of simulated trials
+    reps = 100 # num of simulated trials
     K = 6
     B = 400
     T = 1200
@@ -169,13 +169,23 @@ def main():
         
         # C3T-Budget
 
-        rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget(T, B, S, K, pats, arr_rate,
-                                                                                tox_thre, eff_thre, p_true,
-                                                                                q_true, opt, dose_labels, no_skip=True)
+        # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget(T, B, S, K, pats, arr_rate,
+        #                                                                         tox_thre, eff_thre, p_true,
+        #                                                                         q_true, opt, dose_labels, no_skip=False)
         
+        # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T(T, B, S, K, pats, arr_rate,
+        #                                                                         tox_thre, eff_thre, p_true,
+        #                                                                         q_true, opt, dose_labels)
+        # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_with_gradient_temp(T, B, S, K, pats, arr_rate,
+        #                                                                         tox_thre, eff_thre, p_true,
+        #                                                                         q_true, opt, dose_labels)
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all(T, B, S, K, pats, arr_rate,
         #                                                                     tox_thre, eff_thre, p_true,
         #                                                                     q_true, opt, dose_skeleton_labels)
+        rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all_with_gradient(T, B, S, K, pats, arr_rate,
+                                                                             tox_thre, eff_thre, p_true,
+                                                                             q_true, opt, dose_skeleton_labels)
+
         out_metrics.rec[:, :] = np.squeeze(out_metrics.rec[:, :]) + rec
         out_metrics.cum_eff[:] = out_metrics.cum_eff[:] + cum_eff
         out_metrics.cum_tox[:] = out_metrics.cum_tox[:] + cum_tox
@@ -230,38 +240,39 @@ def main():
     plt.subplot(336)
     plot_mse(T, out_metrics.q_mse_reps[2, :, :, :], avg_over_doses=False, plot_one_dose=str(3))
 
-    plt.subplot(337)
-    subgroup_index = 0
-    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-
-    plt.subplot(338)
-    subgroup_index = 1
-    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-
-    plt.subplot(339)
-    subgroup_index = 2
-    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-
     # plt.subplot(337)
     # subgroup_index = 0
-    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-    #                          dose_skeleton_labels, dose_skeleton)
+    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
 
     # plt.subplot(338)
     # subgroup_index = 1
-    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-    #                          dose_skeleton_labels, dose_skeleton)
+    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
 
     # plt.subplot(339)
     # subgroup_index = 2
-    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-    #                          dose_skeleton_labels, dose_skeleton)
+    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
+
+    # Plots for combined (non-contextual) model
+    plt.subplot(337)
+    subgroup_index = 0
+    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+                             dose_skeleton_labels, dose_skeleton)
+
+    plt.subplot(338)
+    subgroup_index = 1
+    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+                             dose_skeleton_labels, dose_skeleton)
+
+    plt.subplot(339)
+    subgroup_index = 2
+    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+                             dose_skeleton_labels, dose_skeleton)
 
 
     plt.tight_layout()

@@ -60,3 +60,53 @@ def initialize_dose_label(p_true_val, a0):
 
 def get_toxicity(dose_label, a):
     return ((np.tanh(dose_label) + 1.) / 2.)**a
+
+def get_toxicity_helper(dose_label):
+    return ((np.tanh(dose_label) + 1.) / 2.)
+
+def get_log_likelihood(a, K, subgroup_idx, dose_label, n_choose, n_tox):
+    total_output = 0
+    for k in range(K):
+        N_k = n_choose[subgroup_idx, k]
+        n_tox_k = n_tox[subgroup_idx, k]
+        term1 = a * n_tox_k * np.log(get_toxicity_helper(dose_label))
+        term2 = (N_k - n_tox_k) * np.log(1 - (get_toxicity(dose_label, a)))
+        output = term1 + term2
+        total_output += output
+    return output
+
+def get_log_likelihood_gradient(a, K, subgroup_idx, dose_labels, n_choose, n_tox):
+    total_output = 0
+    for k in range(K):
+        N_k = n_choose[subgroup_idx, k]
+        n_tox_k = n_tox[subgroup_idx, k]
+        dose_label = dose_labels[k]
+        prob_tox = get_toxicity(dose_label, a)
+        # print(a, dose_label, prob_tox)
+        output = (n_tox_k - (prob_tox * N_k)) * (np.log(get_toxicity_helper(dose_label)) / (1. - prob_tox))
+        if prob_tox == 1:
+            output = 0.01
+        total_output += output
+    return output
+
+def get_log_likelihood_gradient_combined(a, K, dose_labels, n_choose, n_tox):
+    total_output = 0
+    for k in range(K):
+        N_k = n_choose[k]
+        n_tox_k = n_tox[k]
+        dose_label = dose_labels[k]
+        prob_tox = get_toxicity(dose_label, a)
+        # print(a, dose_label, prob_tox)
+        output = (n_tox_k - (prob_tox * N_k)) * (np.log(get_toxicity_helper(dose_label)) / (1. - prob_tox))
+        if prob_tox == 1:
+            output = 0.01
+        total_output += output
+    return output
+
+def gradient_ascent_update(old_alpha, learning_rate, K, subgroup_idx, dose_label, n_choose, n_tox, is_combined_model=False):
+    if is_combined_model:
+        gradient = get_log_likelihood_gradient_combined(old_alpha, K, dose_label, n_choose, n_tox)
+    else:
+        gradient = get_log_likelihood_gradient(old_alpha, K, subgroup_idx, dose_label, n_choose, n_tox)
+    new_alpha = old_alpha + learning_rate * gradient
+    return new_alpha
