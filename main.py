@@ -7,23 +7,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from helpers import gen_patients, initialize_dose_label, get_toxicity
-from c3t_budget import run_C3T_Budget, run_C3T_Budget_all, run_C3T, run_C3T_with_gradient_temp, run_C3T_Budget_all_with_gradient
+from helpers import C3T_Metrics, gen_patients, initialize_dose_label, get_toxicity
+from c3t_budget import run_C3T_Budget, run_C3T_Budget_all, run_C3T, run_C3T_with_gradient, run_C3T_Budget_all_with_gradient
 
 
 np.random.seed(0)
-class C3T_Metrics:
-    def __init__(self, S, K, B, T, reps):
-        self.rec = np.zeros((S, K+1))
-        self.cum_eff = np.zeros(B)
-        self.cum_tox = np.zeros(B)
-        self.cum_s = np.zeros((S, T, reps))
-        self.typeI = np.zeros(S)
-        self.typeII = np.zeros(S)
-        self.rec_err = np.zeros(S)
-        self.a_hat_fin = np.zeros((S, reps))
-        self.p_hat = np.zeros((S, K, reps))
-        self.q_mse_reps = np.zeros((S, K, T, reps))
 
 def plot_num_patients(B, T, subgroup_idx, subgroup_label, p_rec, cum_s):
     # out_arr = cum_s[subgroup_idx, :, :]
@@ -124,12 +112,47 @@ def plot_dose_toxicity_curve_with_skeleton(dose_labels, p_true, a_hat_fin, p_emp
     plt.xlabel('Dose labels')
     plt.ylabel('Toxicity')
 
+def plot_over_time(num_reps, num_groups, total_time, total_eff_regret, eff_regret, value_name):
+    # row = time, column = trial
+    # subgroups, time, trial
+    regret_frame = pd.DataFrame(total_eff_regret)
+    regret_frame = regret_frame.reset_index()
+    # index = time
+    regret_frame = pd.melt(regret_frame, id_vars=['index'], var_name='trial', value_name=value_name)
+    regret_frame['group'] = np.repeat('all', num_reps * total_time)
+    group_frames = []
+    for group in range(num_groups):
+        group_arr = eff_regret[group, :, :]
+        group_frame = pd.DataFrame(group_arr)
+        group_frame = group_frame.reset_index()
+        group_frame = pd.melt(group_frame, id_vars=['index'], var_name='trial', value_name=value_name)
+        group_frame['group'] = np.repeat(str(group), num_reps * total_time)
+        group_frames.append(group_frame)
+    regret_frame = pd.concat([regret_frame] + group_frames)
+    sns.lineplot(data=regret_frame, x='index', y=value_name, hue='group')
+    plt.xlabel('Time')
+    plt.ylabel(value_name)
+
+def plot_outcome(outcome_vals, value_name):
+    '''
+    Recomended dose error plot - seaborn boxplot
+    x-axis: subgroup
+    y-axis: dose error
+    '''
+    frame = pd.DataFrame(outcome_vals)
+    frame = frame.reset_index()
+    frame = pd.melt(frame, id_vars=['index'], var_name='trial', value_name=value_name)
+    sns.pointplot(x='index', y=value_name, data=frame, join=False)
+    plt.ylim(0, 1.0)
+    plt.xlabel('Subgroup')
+    plt.ylabel(value_name)
+
 
 def main():
     reps = 100 # num of simulated trials
     K = 6
-    B = 400
-    T = 1200
+    B = 300
+    T = 300
     S = 3
     arr_rate = [5, 4, 3]
     tox_thre = 0.35 # toxicity threshold
@@ -146,6 +169,7 @@ def main():
                       [0.10, 0.20, 0.30, 0.50, 0.60, 0.65],
                       [0.20, 0.50, 0.60, 0.80, 0.84, 0.85]])
     
+
     dose_skeleton = np.mean(p_true, axis=0)
     dose_skeleton_labels = initialize_dose_label(dose_skeleton, a0)
 
@@ -176,26 +200,34 @@ def main():
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T(T, B, S, K, pats, arr_rate,
         #                                                                         tox_thre, eff_thre, p_true,
         #                                                                         q_true, opt, dose_labels)
-        # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_with_gradient_temp(T, B, S, K, pats, arr_rate,
-        #                                                                         tox_thre, eff_thre, p_true,
-        #                                                                         q_true, opt, dose_labels)
+        run_metrics = run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
+        
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all(T, B, S, K, pats, arr_rate,
         #                                                                     tox_thre, eff_thre, p_true,
         #                                                                     q_true, opt, dose_skeleton_labels)
-        rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all_with_gradient(T, B, S, K, pats, arr_rate,
-                                                                             tox_thre, eff_thre, p_true,
-                                                                             q_true, opt, dose_skeleton_labels)
+        # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all_with_gradient(T, B, S, K, pats, arr_rate,
+        #                                                                      tox_thre, eff_thre, p_true,
+        #                                                                      q_true, opt, dose_skeleton_labels)
 
-        out_metrics.rec[:, :] = np.squeeze(out_metrics.rec[:, :]) + rec
-        out_metrics.cum_eff[:] = out_metrics.cum_eff[:] + cum_eff
-        out_metrics.cum_tox[:] = out_metrics.cum_tox[:] + cum_tox
-        out_metrics.cum_s[:, :, i] = np.squeeze(out_metrics.cum_s[:, :, i]) + cum_s
-        out_metrics.typeI[:] = out_metrics.typeI[:] + typeI
-        out_metrics.typeII[:] = out_metrics.typeII[:] + typeII
-        out_metrics.rec_err[:] = out_metrics.rec_err[:] + rec_err
-        out_metrics.a_hat_fin[:, i] = a_hat_fin
-        out_metrics.p_hat[:, :, i] = p_hat
-        out_metrics.q_mse_reps[:, :, :, i] = q_mse
+        out_metrics.rec[:, :] = np.squeeze(out_metrics.rec[:, :]) + run_metrics.rec
+        out_metrics.total_cum_eff[:, i] = run_metrics.total_cum_eff
+        out_metrics.total_cum_tox[:, i] = run_metrics.total_cum_tox
+        out_metrics.cum_eff[:, :, i] = run_metrics.cum_eff
+        out_metrics.cum_tox[:, :, i] = run_metrics.cum_tox
+        out_metrics.cum_s[:, :, i] = np.squeeze(out_metrics.cum_s[:, :, i]) + run_metrics.cum_s
+        out_metrics.typeI[:] = out_metrics.typeI[:] + run_metrics.typeI
+        out_metrics.typeII[:] = out_metrics.typeII[:] + run_metrics.typeII
+        out_metrics.rec_err[:, i] = run_metrics.rec_err
+        out_metrics.a_hat_fin[:, i] = run_metrics.a_hat_fin
+        out_metrics.p_hat[:, :, i] = run_metrics.p_hat
+        # MSE wrt efficacy
+        out_metrics.q_mse_reps[:, :, :, i] = run_metrics.q_mse
+        # Regret
+        out_metrics.total_eff_regret[:, i] = run_metrics.total_eff_regret
+        out_metrics.eff_regret[:, :, i] = run_metrics.eff_regret
+        out_metrics.total_tox_regret[:, i] = run_metrics.total_tox_regret
+        out_metrics.tox_regret[:, :, i] = run_metrics.tox_regret
+        out_metrics.safety_violations[:, i] = run_metrics.safety_violations
 
     a_hat_fin_mean = np.mean(out_metrics.a_hat_fin, axis=1)
     p_hat_fin_mean = np.mean(out_metrics.p_hat, axis=2)
@@ -203,7 +235,7 @@ def main():
     # Print results
     print("== Recommended dose error rates ==============")
     print(f"Algorithm |  SG1  |  SG2  |  SG3  | Total |")
-    print(f"C3T-Budget | {out_metrics.rec_err[0] / reps} | {out_metrics.rec_err[1] / reps} | {out_metrics.rec_err[2] / reps} | {np.mean(out_metrics.rec_err) / reps}")
+    print(f"C3T-Budget | {out_metrics.rec_err.mean(axis=1)[0]} | {out_metrics.rec_err.mean(axis=1)[1]} | {out_metrics.rec_err.mean(axis=1)[2]} | {out_metrics.rec_err.mean()}")
 
     typeI = np.mean(out_metrics.typeI / reps)
     typeII = np.mean(out_metrics.typeII / reps)
@@ -212,8 +244,8 @@ def main():
     print("Algorithm |  Type-I  |  Type-II |  Total   |")
     print(f"C3T-Budget | {typeI} | {typeII} | {(typeI + typeII) / 2}")
 
-    efficacy = np.max(out_metrics.cum_eff) / B / reps
-    toxicity = np.max(out_metrics.cum_tox) / B / reps
+    efficacy = out_metrics.total_cum_eff[-1, :].mean() / out_metrics.total_cum_eff.shape[0]
+    toxicity = out_metrics.total_cum_tox[-1, :].mean() / out_metrics.total_cum_eff.shape[0]
     print("== Efficacy and toxicity per patient =======")
     print("Algorithm |   Efficacy   |   Toxicity   |")
     print(f"C3T_Budget | {efficacy} | {toxicity}")
@@ -222,64 +254,63 @@ def main():
     sns.set_theme()
 
     # Subgroup plots
+    # Dose toxicity for contextual model
     plt.subplot(331)
-    plot_num_patients(B, T, 0, 'Subgroup 1', p_rec, out_metrics.cum_s)
+    subgroup_index = 0
+    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
 
     plt.subplot(332)
-    plot_num_patients(B, T, 1, 'Subgroup 2', p_rec, out_metrics.cum_s)
+    subgroup_index = 1
+    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
 
     plt.subplot(333)
-    plot_num_patients(B, T, 2, 'Subgroup 3', p_rec, out_metrics.cum_s)
+    subgroup_index = 2
+    plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
+                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
+
 
     plt.subplot(334)
-    plot_mse(T, out_metrics.q_mse_reps[0, :, :, :], avg_over_doses=True)
+    plot_over_time(reps, S, T, out_metrics.total_eff_regret, out_metrics.eff_regret, 'Regret')
 
     plt.subplot(335)
-    plot_mse(T, out_metrics.q_mse_reps[1, :, :, :], avg_over_doses=False, plot_one_dose=str(3))
+    plot_over_time(reps, S, T, out_metrics.total_cum_eff, out_metrics.cum_eff, 'Efficacy')
 
     plt.subplot(336)
-    plot_mse(T, out_metrics.q_mse_reps[2, :, :, :], avg_over_doses=False, plot_one_dose=str(3))
+    plot_over_time(reps, S, T, out_metrics.total_cum_tox, out_metrics.cum_tox, 'Toxicity')
 
+    plt.subplot(337)
+    plot_outcome(out_metrics.rec_err, 'Dose Error')
+
+    plt.subplot(338)
+    plot_over_time(reps, S, T, out_metrics.total_tox_regret, out_metrics.tox_regret, 'Toxicity Regret')
+
+    plt.subplot(339)
+    plot_outcome(out_metrics.safety_violations, 'Safety Constraint Violations')
+
+
+    # Plots for combined (non-contextual) model
     # plt.subplot(337)
     # subgroup_index = 0
-    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
+    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+    #                          dose_skeleton_labels, dose_skeleton)
 
     # plt.subplot(338)
     # subgroup_index = 1
-    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
+    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+    #                          dose_skeleton_labels, dose_skeleton)
 
     # plt.subplot(339)
     # subgroup_index = 2
-    # plot_dose_toxicity_curve(dose_labels[subgroup_index], p_true[subgroup_index],
-    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-
-    # Plots for combined (non-contextual) model
-    plt.subplot(337)
-    subgroup_index = 0
-    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-                             dose_skeleton_labels, dose_skeleton)
-
-    plt.subplot(338)
-    subgroup_index = 1
-    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-                             dose_skeleton_labels, dose_skeleton)
-
-    plt.subplot(339)
-    subgroup_index = 2
-    plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
-                             out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
-                             dose_skeleton_labels, dose_skeleton)
+    # plot_dose_toxicity_curve_with_skeleton(dose_labels[subgroup_index], p_true[subgroup_index],
+    #                          out_metrics.a_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :], 
+    #                          dose_skeleton_labels, dose_skeleton)
 
 
     plt.tight_layout()
     plt.show()
 
 main()
-# print(get_expected_improvement(1, 3))
-# print(alpha_func(0.1, 6, 0.35, 15))
-# print(get_ucb(0.5, 0.5, 7, 11))
-# print(gen_patients(10, [5, 4, 3]))
