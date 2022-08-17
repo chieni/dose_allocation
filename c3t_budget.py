@@ -4,7 +4,7 @@ import numpy as np
 from scipy.stats import beta 
 import pandas as pd
 from helpers import alpha_func, get_expected_improvement, get_ucb, get_toxicity, gradient_ascent_update, Internal_C3T_Metrics, \
-                    get_toxicity_two_param_model
+                    get_toxicity_two_param_model, gradient_ascent_two_param_update, get_toxicity_two_param_model
 
 
 def run_C3T_Budget(T, B, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels, no_skip=False):
@@ -786,7 +786,7 @@ def run_shared_param_model(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, op
                 # Calculate alpha
                 alpha[s] = alpha_func(dose_labels[s, :], K, delta[s], np.sum(n_choose[s, :])) 
                 # Available set of doses
-                D[s, :] = get_toxicity(dose_labels[s, :], current_a_hat, current_b_hat[s]) <= tox_thre
+                D[s, :] = get_toxicity_two_param_model(dose_labels[s, :], current_a_hat, current_b_hat[s]) <= tox_thre
                 # D[s, :] = p_hat[s, :] <= tox_thre
 
             # I[t] = selected dose
@@ -810,18 +810,20 @@ def run_shared_param_model(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, op
         update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre)
 
         # Update alpha params
-        new_alpha = gradient_ascent_two_param_update(current_a_hat[curr_s], 0.0001, K, curr_s,
-                                                     dose_labels[curr_s, :], n_choose, n_tox)
-        if new_alpha > a_max:
-            new_alpha = a_max
-        if new_alpha < 0:
-            new_alpha = 0.01
+        new_a, new_b = gradient_ascent_two_param_update(current_a_hat, current_b_hat[curr_s], 0.0001, dose_labels[curr_s, :],
+                                                        K, curr_s, n_choose, n_tox)
+        if new_a > a_max:
+            new_a = a_max
+        if new_a < 0:
+            new_a = 0.01
         
-        current_a_hat[curr_s] = new_alpha
+        # Put bounds on b?
+        current_a_hat = new_a
+        current_b_hat[curr_s] = new_b
         t += 1
 
-    finalize_results_with_gradient(metrics, T, t, K, S, X, H, n_choose, current_a_hat, dose_labels,
-                                   tox_thre, eff_thre, q_bar, p_true, opt_ind)
+    finalize_results_with_gradient_shared_param(metrics, T, t, K, S, X, H, n_choose, current_a_hat, current_b_hat, dose_labels,
+                                                tox_thre, eff_thre, q_bar, p_true, opt_ind)
     return metrics
 
 def update_metrics_with_gradients(metrics: Internal_C3T_Metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre):
@@ -885,17 +887,15 @@ def update_metrics_with_gradients(metrics: Internal_C3T_Metrics, X, Y, I, t, K, 
                 metrics.tox_regret[group_idx, t] = 0
 
 def finalize_results_with_gradient(metrics: Internal_C3T_Metrics, T, t, K, S, X, H, n_choose, a_hat, dose_labels,
-                     tox_thre, eff_thre, q_bar, p_true, opt_ind,
-                     uses_context=True):
+                     tox_thre, eff_thre, q_bar, p_true, opt_ind, uses_context=True):
     # Recommendation and observe results
     for s in range(S):
+        metrics.a_hat_fin[s] = a_hat[s]
         if uses_context:
-            metrics.a_hat_fin[s] = a_hat[s]
             metrics.p_out[s, :] = get_toxicity(dose_labels[s, :], metrics.a_hat_fin[s])
             # Dose with max empirical efficacy also below toxicity threshold
             q_below_tox_thre = q_bar[s, :] * (metrics.p_out[s, :] <= tox_thre)
         else:
-            metrics.a_hat_fin[s] = a_hat[s]
             metrics.p_out[s, :] = get_toxicity(dose_labels, metrics.a_hat_fin[s])
             # Dose with max empirical efficacy also below toxicity threshold
             q_below_tox_thre = q_bar * (metrics.p_out[s, :] <= tox_thre)
@@ -931,6 +931,46 @@ def finalize_results_with_gradient(metrics: Internal_C3T_Metrics, T, t, K, S, X,
     metrics.typeI = metrics.typeI / K
     metrics.typeII = metrics.typeII / K
 
+def finalize_results_with_gradient_shared_param(metrics: Internal_C3T_Metrics, T, t, K, S, X, H, n_choose, a_hat, b_hat, dose_labels,
+                                                tox_thre, eff_thre, q_bar, p_true, opt_ind):
+    # Recommendation and observe results
+    for s in range(S):
+        metrics.a_hat_fin_shared = a_hat
+        metrics.b_hat_fin[s] = b_hat[s]
+        metrics.p_out[s, :] = get_toxicity_two_param_model(dose_labels[s, :], metrics.a_hat_fin_shared, metrics.b_hat_fin[s])
+        # Dose with max empirical efficacy also below toxicity threshold
+        q_below_tox_thre = q_bar[s, :] * (metrics.p_out[s, :] <= tox_thre)
+        max_dose_val = np.max(q_below_tox_thre)
+        max_dose_idx = np.argmax(q_below_tox_thre)
+
+
+        # If the recommended dose is above efficacy threshold, dose rec is correct, assign to rec
+        if max_dose_val >= eff_thre:
+            metrics.rec[s, max_dose_idx] = 1
+        # If recommended dose is not above efficacy threshold, assign no dose to rec
+        else:
+            metrics.rec[s, K] = 1
+            max_dose_idx = K
+
+        if max_dose_idx != opt_ind[s]:
+            metrics.rec_err[s] = 1
+        
+        for i in range(K):
+            if p_true[s, i] <= tox_thre and metrics.p_out[s, i] > tox_thre:
+                metrics.typeI[s] += 1
+            else:
+                if p_true[s, i] > tox_thre and metrics.p_out[s, i] <= tox_thre:
+                    metrics.typeII[s] += 1
+                    
+    if t < T:
+        metrics.q_mse[:, :, t:] = np.tile(np.expand_dims(metrics.q_mse[:, :, t-1], axis=2), (1, 1, T-t))  
+
+    for tau in range(t):
+        if X[tau] > -1:
+            metrics.cum_s[H[tau], tau:] += 1
+
+    metrics.typeI = metrics.typeI / K
+    metrics.typeII = metrics.typeII / K
 
 def run_C3T_Budget_all_with_gradient(T, B, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
     '''

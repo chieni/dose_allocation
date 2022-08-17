@@ -8,7 +8,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 from helpers import C3T_Metrics, gen_patients, initialize_dose_label, get_toxicity
-from c3t_budget import run_C3T_Budget, run_C3T_Budget_all, run_C3T, run_C3T_with_gradient, run_C3T_Budget_all_with_gradient
+from c3t_budget import run_C3T_Budget, run_C3T_Budget_all, run_C3T, run_C3T_with_gradient, \
+                       run_C3T_Budget_all_with_gradient, run_shared_param_model
 
 
 np.random.seed(0)
@@ -212,7 +213,8 @@ def main():
     # Initialize actual dose levels
     dose_labels = np.zeros((S, K))
     for s in range(S):
-        dose_labels[s, :] = initialize_dose_label(p_true[s, :], a0)
+        #dose_labels[s, :] = initialize_dose_label(p_true[s, :], a0)
+        dose_labels[s, :] = initialize_dose_label(dose_skeleton, a0)
     
     # optimal doses
     opt = np.array([6, 3, 3])
@@ -236,7 +238,8 @@ def main():
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T(T, B, S, K, pats, arr_rate,
         #                                                                         tox_thre, eff_thre, p_true,
         #                                                                         q_true, opt, dose_labels)
-        run_metrics = run_C3T_with_gradient(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
+        #run_metrics = run_C3T_with_gradient(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
+        run_metrics = run_shared_param_model(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
         
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all(T, B, S, K, pats, arr_rate,
         #                                                                     tox_thre, eff_thre, p_true,

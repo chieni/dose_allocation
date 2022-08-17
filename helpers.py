@@ -28,6 +28,9 @@ class Internal_C3T_Metrics:
         self.a_hat_fin = np.zeros(S)
         self.p_out = np.zeros((S, K))
 
+        self.a_hat_fin_shared = 0
+        self.b_hat_fin = np.zeros(S)
+
 
 class C3T_Metrics:
     def __init__(self, S, K, B, T, reps):
@@ -40,6 +43,7 @@ class C3T_Metrics:
         self.typeI = np.zeros(S)
         self.typeII = np.zeros(S)
         self.rec_err = np.zeros((S, reps))
+
         self.a_hat_fin = np.zeros((S, reps))
         self.p_hat = np.zeros((S, K, reps))
         self.q_mse_reps = np.zeros((S, K, T, reps))
@@ -50,6 +54,7 @@ class C3T_Metrics:
         self.safety_violations = np.zeros((S, reps))
         self.pats_count = np.zeros((S, reps))
         self.dose_err_by_person = np.zeros((S, reps))
+
 
 
 def alpha_func(dose_level, K, max_toxicity_prob, subgroup_count):
