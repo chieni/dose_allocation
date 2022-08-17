@@ -576,7 +576,7 @@ def run_C3T(T, B, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_
     return rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat
 
 
-def run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
+def run_C3T_with_gradient(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
     '''
     Contextual, no budget version with gradient
 
@@ -613,9 +613,6 @@ def run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q
     metrics = Internal_C3T_Metrics(S, K, T)
 
     # Define variables and parameters
-    arrive_sum = sum(arr_rate)
-    arrive_dist = [rate/arrive_sum for rate in arr_rate]
-
     t = 0 # timestep
 
     s_arrive = np.zeros(S)
@@ -685,7 +682,7 @@ def run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q
         
         q_ei[curr_s, I[t]] = get_expected_improvement(q_a[curr_s, I[t]], q_b[curr_s, I[t]])
 
-        update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre)
+        update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre)
 
         # Update alpha params
         new_alpha = gradient_ascent_update(current_a_hat[curr_s], 0.0001, K, curr_s,
@@ -702,7 +699,7 @@ def run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q
                                    tox_thre, eff_thre, q_bar, p_true, opt_ind)
     return metrics
 
-def run_shared_param_model(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
+def run_shared_param_model(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
     '''
     Contextual, no budget version with gradient
 
@@ -741,9 +738,6 @@ def run_shared_param_model(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, 
     metrics = Internal_C3T_Metrics(S, K, T)
 
     # Define variables and parameters
-    arrive_sum = sum(arr_rate)
-    arrive_dist = [rate/arrive_sum for rate in arr_rate]
-
     t = 0 # timestep
 
     s_arrive = np.zeros(S)
@@ -813,7 +807,7 @@ def run_shared_param_model(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, 
         
         q_ei[curr_s, I[t]] = get_expected_improvement(q_a[curr_s, I[t]], q_b[curr_s, I[t]])
 
-        update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre)
+        update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre)
 
         # Update alpha params
         new_alpha = gradient_ascent_two_param_update(current_a_hat[curr_s], 0.0001, K, curr_s,
@@ -830,19 +824,28 @@ def run_shared_param_model(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, 
                                    tox_thre, eff_thre, q_bar, p_true, opt_ind)
     return metrics
 
-def update_metrics_with_gradients(metrics: Internal_C3T_Metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre):
-    # TODO: How to count regret if the optimal dose is no dose?
+def update_metrics_with_gradients(metrics: Internal_C3T_Metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre):
     # Regret = opt dose efficacy - q_true of selected
-    if I[t] == K or opt_ind[curr_s] == K:
-        curr_eff_regret = 0
+        
+    if I[t] == K:
+        selected_eff_regret = eff_thre
+    else:
+        selected_eff_regret = q_true[curr_s, I[t]]
+        
+    if opt_ind[curr_s] == K:
+        optimal_eff_regret = eff_thre
+        optimal_tox_regret = tox_thre
+    else:
+        optimal_eff_regret = q_true[curr_s, opt_ind[curr_s]]
+        optimal_tox_regret = p_true[curr_s, opt_ind[curr_s]]
+
+    curr_eff_regret = optimal_eff_regret - selected_eff_regret
+    curr_tox_regret = optimal_tox_regret - tox_thre
+
+    if curr_tox_regret < 0:
         curr_tox_regret = 0
     else:
-        curr_eff_regret = q_true[curr_s, opt_ind[curr_s]] - q_true[curr_s, I[t]]
-        curr_tox_regret = p_true[curr_s, opt_ind[curr_s]] - tox_thre
-        if curr_tox_regret < 0:
-            curr_tox_regret = 0
-        else:
-            metrics.safety_violations[curr_s] += 1
+        metrics.safety_violations[curr_s] += 1
 
     if t > 0:
         metrics.total_cum_eff[t] = metrics.total_cum_eff[t - 1] + X[t]

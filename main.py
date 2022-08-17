@@ -140,21 +140,57 @@ def plot_outcome(outcome_vals, value_name):
     y-axis: dose error
     '''
     frame = pd.DataFrame(outcome_vals)
+    mean_frame = frame.mean(axis=0) 
+    frame = frame.transpose()
+    frame['all'] = mean_frame
     frame = frame.reset_index()
-    frame = pd.melt(frame, id_vars=['index'], var_name='trial', value_name=value_name)
-    sns.pointplot(x='index', y=value_name, data=frame, join=False)
+    frame = pd.melt(frame, id_vars=['index'], var_name='group', value_name=value_name)
+    sns.pointplot(x='group', y=value_name, data=frame, join=False, kind='point')
     plt.ylim(0, 1.0)
     plt.xlabel('Subgroup')
     plt.ylabel(value_name)
 
+def plot_efficacy_means(total_cum_eff, cum_eff, total_cum_tox, cum_tox, pats_count, T):
+    final_total_eff = total_cum_eff[-1, :] / T
+    final_group_eff = cum_eff[:, -1, :]
+    frame_dict = {'trial': np.arange(len(final_total_eff)),
+                  'all': final_total_eff}
+    for group in range(len(final_group_eff)):
+        group_eff = final_group_eff[group, :]
+        group_count = pats_count[group, :]
+        frame_dict[str(group)] = group_eff / group_count
+    frame = pd.DataFrame(frame_dict)
+    frame = pd.melt(frame, id_vars=['trial'], var_name='group', value_name='Metric per Person')
+    frame['metric'] = 'efficacy'
+
+    final_total_tox = total_cum_tox[-1, :] / T
+    final_group_tox = cum_tox[:, -1, :]
+    tox_frame_dict = {'trial': np.arange(len(final_total_tox)),
+                      'all': final_total_tox}
+    for group in range(len(final_group_tox)):
+        group_tox = final_group_tox[group, :]
+        group_count = pats_count[group, :]
+        tox_frame_dict[str(group)] = group_tox / group_count
+    tox_frame = pd.DataFrame(tox_frame_dict)
+    tox_frame = pd.melt(tox_frame, id_vars=['trial'], var_name='group', value_name='Metric per Person')
+    tox_frame['metric'] = 'toxicity'
+
+    final_frame = pd.concat([frame, tox_frame])
+
+    sns.pointplot(x='group', y='Metric per Person', hue='metric', data=final_frame, join=False, kind='point')
+    plt.xlabel('Subgroup')
+    plt.ylabel('Metric per Person')
 
 def main():
     reps = 100 # num of simulated trials
     K = 6
-    B = 300
-    T = 300
+    B = 30
+    T = 30
     S = 3
     arr_rate = [5, 4, 3]
+    arrive_sum = sum(arr_rate)
+    arrive_dist = [rate/arrive_sum for rate in arr_rate]
+
     tox_thre = 0.35 # toxicity threshold
     eff_thre = 0.2 # efficacy threshold
     a0 = 0.5
@@ -200,7 +236,7 @@ def main():
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T(T, B, S, K, pats, arr_rate,
         #                                                                         tox_thre, eff_thre, p_true,
         #                                                                         q_true, opt, dose_labels)
-        run_metrics = run_C3T_with_gradient(T, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
+        run_metrics = run_C3T_with_gradient(T, S, K, pats, tox_thre, eff_thre, p_true, q_true, opt, dose_labels)
         
         # rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat = run_C3T_Budget_all(T, B, S, K, pats, arr_rate,
         #                                                                     tox_thre, eff_thre, p_true,
@@ -228,6 +264,9 @@ def main():
         out_metrics.total_tox_regret[:, i] = run_metrics.total_tox_regret
         out_metrics.tox_regret[:, :, i] = run_metrics.tox_regret
         out_metrics.safety_violations[:, i] = run_metrics.safety_violations
+        out_metrics.pats_count[:, i] = np.unique(pats, return_counts=True)[1]
+        # Dose error by person
+        out_metrics.dose_err_by_person[:, i] = run_metrics.rec_err / out_metrics.pats_count[:, i]
 
     a_hat_fin_mean = np.mean(out_metrics.a_hat_fin, axis=1)
     p_hat_fin_mean = np.mean(out_metrics.p_hat, axis=2)
@@ -281,10 +320,13 @@ def main():
     plot_over_time(reps, S, T, out_metrics.total_cum_tox, out_metrics.cum_tox, 'Toxicity')
 
     plt.subplot(337)
-    plot_outcome(out_metrics.rec_err, 'Dose Error')
+    plot_outcome(out_metrics.dose_err_by_person, 'Dose Error')
 
+    # Efficacy and toxicity by patient
     plt.subplot(338)
-    plot_over_time(reps, S, T, out_metrics.total_tox_regret, out_metrics.tox_regret, 'Toxicity Regret')
+    #plot_over_time(reps, S, T, out_metrics.total_tox_regret, out_metrics.tox_regret, 'Toxicity Regret')
+    plot_efficacy_means(out_metrics.total_cum_eff, out_metrics.cum_eff, out_metrics.total_cum_tox,
+                        out_metrics.cum_tox, out_metrics.pats_count, T)
 
     plt.subplot(339)
     plot_outcome(out_metrics.safety_violations, 'Safety Constraint Violations')

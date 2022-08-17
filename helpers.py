@@ -48,6 +48,8 @@ class C3T_Metrics:
         self.total_tox_regret = np.zeros((T, reps))
         self.tox_regret = np.zeros((S, T, reps))
         self.safety_violations = np.zeros((S, reps))
+        self.pats_count = np.zeros((S, reps))
+        self.dose_err_by_person = np.zeros((S, reps))
 
 
 def alpha_func(dose_level, K, max_toxicity_prob, subgroup_count):
