@@ -5,9 +5,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from helpers import gen_patients, get_toxicity
 from metrics import ExperimentMetrics
-from dose_finding_models import TwoParamSharedModel, TanhModel, TwoParamModel, TwoParamAllSharedModel
+from dose_finding_models import TwoParamSharedModel, TanhModel, TwoParamModel, TwoParamAllSharedModel, OGTanhModel
 
 
 np.random.seed(0)
@@ -24,6 +23,25 @@ class ExperimentRunner:
         self.q_true = q_true
         self.opt = opt
         self.learning_rate = learning_rate
+
+    def gen_patients(self):
+        '''
+        Generates all patients for an experiment of length T
+        '''
+        # Arrival proportion of each subgroup. If arrive_rate = [5, 4, 3],
+        # arrive_dist = [5/12, 4/12, 3/12]
+        arrive_sum = sum(self.arr_rate)
+        arrive_dist = [rate/arrive_sum for rate in self.arr_rate]
+        arrive_dist.insert(0, 0)
+
+        # [0, 5/12, 9/12, 12/12]
+        arrive_dist_bins = np.cumsum(arrive_dist)
+
+        # Random numbers between 0 and 1 in an array of shape (1, T)
+        patients_gen = np.random.rand(self.num_patients)
+        patients = np.digitize(patients_gen, arrive_dist_bins) - 1
+        return patients
+
 
     def print_results(self, a_hat_fin_mean, out_metrics):
         num_patients = out_metrics.total_cum_eff.shape[0]
@@ -163,7 +181,7 @@ class ExperimentRunner:
         for i in range(self.reps):
             print(f"Trial: {i}")
             # patients arrival generation
-            pats = gen_patients(self.num_patients, self.arr_rate)
+            pats = self.gen_patients()
             for tau in range(self.num_patients):
                 p_rec[pats[tau], tau:, i] += 1
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
@@ -184,7 +202,7 @@ class ExperimentRunner:
         self.print_results(a_hat_fin_mean, exp_metrics)
         self.make_plots(dose_labels, exp_metrics)
     
-    def run_one_param(self, a0):
+    def run_one_param(self, model_type, a0):
         dose_skeleton = np.mean(self.p_true, axis=0)
         dose_skeleton_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
 
@@ -194,12 +212,12 @@ class ExperimentRunner:
         for i in range(self.reps):
             print(f"Trial: {i}")
             # patients arrival generation
-            pats = gen_patients(self.num_patients, self.arr_rate)
+            pats = self.gen_patients()
             for tau in range(self.num_patients):
                 p_rec[pats[tau], tau:, i] += 1
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
                 
-            model = TanhModel(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
+            model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
             for s in range(self.num_subgroups):
                 #dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(p_true[s, :], a0, b0)
                 dose_labels[s, :] = TanhModel.initialize_dose_label(dose_skeleton, a0)
@@ -240,12 +258,12 @@ def main():
             
     runner = ExperimentRunner(reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate)
 
-    a0 = 0.1
-    b0 = 0.1
-    runner.run_two_param(a0, b0)
+    # a0 = 0.1
+    # b0 = 0.1
+    # runner.run_two_param(a0, b0)
 
-    # a0 = 0.5
-    # runner.run_one_param(a0)
+    a0 = 0.5
+    runner.run_one_param(OGTanhModel, a0)
 
 if __name__ == "__main__":
     main()

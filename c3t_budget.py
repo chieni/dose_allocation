@@ -4,7 +4,6 @@ import numpy as np
 from scipy.stats import beta 
 import pandas as pd
 from helpers import alpha_func, get_expected_improvement, get_ucb, get_toxicity, gradient_ascent_update, Internal_C3T_Metrics
-from model_helpers import finalize_results, finalize_results_with_gradient, update_metrics_with_gradients
 from metrics import TrialMetrics
 
 
@@ -491,162 +490,117 @@ def run_C3T(T, B, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_
                      tox_thre, eff_thre, q_bar, p_true, opt_ind)
     return metrics
 
-
-def run_C3T_Budget_all_with_gradient(T, B, S, K, pats, arr_rate, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
-    '''
-    All together model, C3T with no skipping with gradient optimization
-    Input
-    T        : time-horizon
-    B        : budget
-    S        : number of subgroups
-    K        : number of doses
-    pats     : generated patients arrivals
-    arr_rate : patients arrival rate
-    tox_thre : toxicity threshold
-    eff_thre : efficacy threshold
-    p_true   : toxicity probabilities
-    q_true   : efficacy probabilities
-    opt_ind  : MTD doses
-
-    Output
-    rec      : dose recommendation
-    cum_eff  : cumulative efficacy
-    cum_tox  : cumulative toxicity
-    cum_s    : cumulative recruitment of each subgroup
-    typeI    : type-I error for dose safety
-    typeII   : type-II error for dose safety
-    q_mse    : mean squared error of efficacy
-    ''' 
-    a0 = 1/2
-    a_max = 1
-    c = 0.5
-    delta = 1 / B
-    eff_w = 0.6
-
-    q_mse = np.zeros((S, K, T))
-    cum_eff = np.zeros(B)
-    cum_tox = np.zeros(B)
-
-    # Define variables and parameters
-    arrive_sum = sum(arr_rate)
-    arrive_dist = [rate/arrive_sum for rate in arr_rate]
-
-    t = 0 # timestep
-    current_budget = 0 # budget
-
-    s_arrive = 0
-    n_choose = np.zeros((S, K)) # num of selection
-    n_choose_all = np.zeros(K)
-    n_tox = np.zeros(K) # num of toxic events
-    p_hat = np.zeros(K) # estimated toxicity
-    q_bar = np.zeros(K) # estimated efficacy
-    q_hat = np.zeros(K) # estimate efficacy ucb
-
-    alpha = 0
-    dose_set = np.zeros(K) # Matrix for set of doses allowed
-    a_hat = np.zeros(T) # estimated overall a
-    ak_hat = np.ones(K) * a0 # estimated invididual a
-    current_a_hat = a0
-
-    # Variables for expected improvement
-    q_a = np.ones(K)
-    q_b = np.ones(K)
-    q_ei = np.zeros(K)
-
-    I = np.ones(T, dtype=int) * -1 # allocated doses
-    X = np.zeros(T)
-    Y = np.zeros(T)
-    H = pats
-    Z = np.zeros(T)
-
-    while t < T and current_budget < B:
-        # For each subgroup, select dose with largest value in n_choose (across doses) 
-        # I_est = np.argmax(n_choose_all)
-        # a_hat[t] = ak_hat[I_est]
-
-        for s in range(S):
-            q_mse[s, :, t] = np.abs(q_true[s, :] - q_bar)**2
-
-        curr_s = H[t]
-        s_arrive += 1
-
-        # Initialize / burn-in
-        if s_arrive < K: 
-            I[t] = int(s_arrive)
-            n_choose[curr_s, I[t]] = 1
-            n_choose_all[I[t]] = 1
-
-            X[t] = np.random.rand() <= q_true[curr_s, I[t]] # Sample efficacy
-            Y[t] = np.random.rand() <= p_true[curr_s, I[t]] # Sample toxicity
-            n_tox[I[t]] += Y[t]
-
-            q_bar[I[t]] = X[t]
-            q_a[I[t]] += X[t]
-            q_b[I[t]] += 1 - X[t]
-
-            for k in range(K):
-                q_hat[k] = get_ucb(q_bar[k], c, n_choose_all[k], np.sum(n_choose_all))
-            
-            q_ei[I[t]] = get_expected_improvement(q_a[I[t]], q_b[I[t]])
-            p_hat[I[t]] = Y[t]
-            Z[t] = 1
-            
-            if current_budget > 0:
-                cum_eff[current_budget] = cum_eff[current_budget - 1] + X[t]
-                cum_tox[current_budget] = cum_tox[current_budget - 1] + Y[t]
-            current_budget += 1
-
-        # Normal loop
-        else:
-            rho = (B - current_budget) / (T - t)
-
-            # Calculate alpha
-            alpha = alpha_func(dose_labels, 1, delta, np.sum(n_choose_all)) 
-            # Available set of doses
-            # dose_set = get_toxicity(dose_labels, current_a_hat + alpha) <= tox_thre
-            dose_set = p_hat <= tox_thre
-
-            # Max value of efficacy UCB (q_hat) multiplied by 
-            Ix = np.max(q_hat * dose_set)
-            # Max idx
-            Ii = np.argmax(q_hat * dose_set)
-
-            I[t] = Ii
-            X[t] = np.random.rand() <= q_true[curr_s, I[t]]
-            Y[t] = np.random.rand() <= p_true[curr_s, I[t]]
-
-            q_bar[I[t]] = (q_bar[I[t]] * n_choose_all[I[t]] + X[t]) / (n_choose_all[I[t]] + 1)
-            p_hat[I[t]] = (p_hat[I[t]] * n_choose_all[I[t]] + Y[t]) / (n_choose_all[I[t]] + 1)
-            n_choose[curr_s, I[t]] += 1
-            n_choose_all[I[t]] += 1
-            n_tox[I[t]] += Y[t]
-
-            Z[t] = 1
-            q_a[I[t]] += X[t]
-            q_b[I[t]] += 1 - X[t]
-
-            for k in range(K):
-                q_hat[k] = get_ucb(q_bar[k], c, n_choose_all[k], np.sum(n_choose_all))
-            
-            q_ei[I[t]] = get_expected_improvement(q_a[I[t]], q_b[I[t]])
-            if current_budget > 0:
-                cum_eff[current_budget] = cum_eff[current_budget - 1] + X[t]
-                cum_tox[current_budget] = cum_tox[current_budget - 1] + Y[t]
-            current_budget += 1
-            
-        new_alpha = gradient_ascent_update(current_a_hat, 0.0001, K, curr_s,
-                                           dose_labels, n_choose_all, n_tox, is_combined_model=True)
-        if new_alpha > a_max:
-            new_alpha = a_max
-        if new_alpha < 0:
-            new_alpha = 0.01
+def update_metrics_with_gradients(metrics, X, Y, I, t, K, S, opt_ind, curr_s, p_true, q_true, tox_thre, eff_thre):
+    # Regret = opt dose efficacy - q_true of selected
         
-        current_a_hat = new_alpha
+    if I[t] == K:
+        selected_eff_regret = eff_thre
+    else:
+        selected_eff_regret = q_true[curr_s, I[t]]
+        
+    if opt_ind[curr_s] == K:
+        optimal_eff_regret = eff_thre
+        optimal_tox_regret = tox_thre
+    else:
+        optimal_eff_regret = q_true[curr_s, opt_ind[curr_s]]
+        optimal_tox_regret = p_true[curr_s, opt_ind[curr_s]]
 
-        t += 1
+    curr_eff_regret = optimal_eff_regret - selected_eff_regret
+    curr_tox_regret = optimal_tox_regret - tox_thre
 
-    a_hat = np.ones(S) * current_a_hat
-    rec, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin = finalize_results_with_gradient(T, t, K, S, X, H, n_choose_all, a_hat, dose_labels,
-                     tox_thre, eff_thre, q_mse, q_bar, p_true, opt_ind, uses_context=False)
-    p_hat = np.tile(p_hat, (S, 1))
-    return rec, cum_eff, cum_tox, cum_s, typeI, typeII, q_mse, rec_err, a_hat_fin, p_hat
+    if curr_tox_regret < 0:
+        curr_tox_regret = 0
+    else:
+        metrics.safety_violations[curr_s] += 1
+    regret = I[t] != opt_ind[curr_s]
+
+    if t > 0:
+        metrics.total_cum_eff[t] = metrics.total_cum_eff[t - 1] + X[t]
+        metrics.total_cum_tox[t] = metrics.total_cum_tox[t - 1] + Y[t]
+        metrics.total_eff_regret[t] = metrics.total_eff_regret[t - 1] + curr_eff_regret
+        metrics.total_tox_regret[t] = metrics.total_tox_regret[t - 1] + curr_tox_regret
+        
+        metrics.cum_eff[curr_s, t] = metrics.cum_eff[curr_s, t - 1] + X[t]
+        metrics.cum_tox[curr_s, t] = metrics.cum_tox[curr_s, t - 1] + Y[t]
+        metrics.eff_regret[curr_s, t] = metrics.eff_regret[curr_s, t - 1] + curr_eff_regret
+        metrics.tox_regret[curr_s, t] = metrics.tox_regret[curr_s, t - 1] + curr_tox_regret
+        metrics.regret[curr_s, t] = metrics.regret[curr_s, t - 1] + regret
+        
+        for group_idx in range(S):
+            if group_idx != curr_s:
+                metrics.eff_regret[group_idx, t] = metrics.eff_regret[group_idx, t - 1]
+                metrics.cum_eff[group_idx, t] = metrics.cum_eff[group_idx, t - 1] 
+                metrics.cum_tox[group_idx, t] = metrics.cum_tox[group_idx, t - 1]
+                metrics.eff_regret[group_idx, t] = metrics.eff_regret[group_idx, t - 1]
+                metrics.regret[group_idx, t] = metrics.regret[group_idx, t - 1]
+
+    else:
+        metrics.total_cum_eff[t] = X[t]
+        metrics.total_cum_tox[t] = Y[t]
+        metrics.total_eff_regret[t] = curr_eff_regret
+        metrics.total_tox_regret[t] = curr_tox_regret
+    
+        metrics.cum_eff[curr_s, t] = X[t]
+        metrics.cum_tox[curr_s, t] = Y[t]
+        metrics.eff_regret[curr_s, t] = curr_eff_regret
+        metrics.tox_regret[curr_s, t] = curr_tox_regret
+        metrics.regret[curr_s, 0] = regret
+
+        for group_idx in range(S):
+            if group_idx != curr_s:
+                metrics.eff_regret[group_idx, t] = 0
+                metrics.cum_eff[group_idx, t] = 0
+                metrics.cum_tox[group_idx, t] = 0
+                metrics.tox_regret[group_idx, t] = 0
+                metrics.regret[group_idx, 0] = 0
+
+def finalize_results(metrics, T, t, K, S, X, H, n_choose, ak_hat, dose_labels,
+                     tox_thre, eff_thre, q_bar, p_true, opt_ind,
+                     uses_context=True):
+    p_out = np.zeros((S, K))
+
+    for s in range(S):
+        if uses_context:
+            I_est = np.argmax(n_choose[s, :])
+            metrics.a_hat_fin[s] = ak_hat[s, I_est]
+            p_out[s, :] = get_toxicity(dose_labels[s, :], metrics.a_hat_fin[s])
+            # Dose with max empirical efficacy also below toxicity threshold
+            q_below_tox_thre = q_bar[s, :] * (p_out[s, :] <= tox_thre)
+        else:
+            I_est = np.argmax(n_choose)
+            metrics.a_hat_fin[s] = ak_hat[I_est]
+            p_out[s, :] = get_toxicity(dose_labels, metrics.a_hat_fin[s])
+            # Dose with max empirical efficacy also below toxicity threshold
+            q_below_tox_thre = q_bar * (p_out[s, :] <= tox_thre)
+        max_dose_val = np.max(q_below_tox_thre)
+        max_dose_idx = np.argmax(q_below_tox_thre)
+
+        # If the recommended dose is above efficacy threshold, dose rec is correct
+        if max_dose_val >= eff_thre:
+            metrics.rec[s, max_dose_idx] = 1
+        else:
+            metrics.rec[s, K] = 1
+            max_dose_idx = K
+
+        if max_dose_idx != opt_ind[s]:
+            metrics.rec_err[s] = 1
+        
+        for i in range(K):
+            if p_true[s, i] <= tox_thre and p_out[s, i] > tox_thre:
+                metrics.typeI[s] += 1
+            else:
+                if p_true[s, i] > tox_thre and p_out[s, i] <= tox_thre:
+                    metrics.typeII[s] += 1
+                    
+    if t < T:
+        metrics.q_mse[:, :, t:] = np.tile(np.expand_dims(metrics.q_mse[:, :, t-1], axis=2), (1, 1, T-t))  
+
+
+    metrics.typeI = metrics.typeI / K
+    metrics.typeII = metrics.typeII / K
+    metrics.pats_count = np.unique(H, return_counts=True)[1]
+    metrics.dose_err_by_person = metrics.rec_err / metrics.pats_count
+    metrics.cum_eff_by_person = metrics.cum_eff[:, -1] / metrics.pats_count
+    metrics.cum_tox_by_person = metrics.cum_tox[:, -1] / metrics.pats_count
+    metrics.eff_regret_by_person = metrics.eff_regret[:, -1] / metrics.pats_count
+    metrics.regret_by_person = metrics.regret[:, -1] / metrics.pats_count
