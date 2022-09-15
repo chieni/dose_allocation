@@ -26,10 +26,8 @@ class Internal_C3T_Metrics:
         self.typeI = np.zeros(S)
         self.typeII = np.zeros(S)
         self.a_hat_fin = np.zeros(S)
-        self.p_out = np.zeros((S, K))
-
-        self.a_hat_fin_shared = 0
         self.b_hat_fin = np.zeros(S)
+        self.p_out = np.zeros((S, K))
 
 
 class C3T_Metrics:
@@ -45,6 +43,7 @@ class C3T_Metrics:
         self.rec_err = np.zeros((S, reps))
 
         self.a_hat_fin = np.zeros((S, reps))
+        self.b_hat_fin = np.zeros((S, reps))
         self.p_hat = np.zeros((S, K, reps))
         self.q_mse_reps = np.zeros((S, K, T, reps))
         self.total_eff_regret = np.zeros((T, reps))
@@ -54,6 +53,9 @@ class C3T_Metrics:
         self.safety_violations = np.zeros((S, reps))
         self.pats_count = np.zeros((S, reps))
         self.dose_err_by_person = np.zeros((S, reps))
+        self.cum_eff_by_person = np.zeros((S, reps))
+        self.cum_tox_by_person = np.zeros((S, reps))
+        self.eff_regret_by_person = np.zeros((S, reps))
 
 
 
@@ -103,11 +105,6 @@ def gen_patients(T, arrive_rate):
     patients_gen = np.random.rand(T)
     patients = np.digitize(patients_gen, arrive_dist_bins) - 1
     return patients
-
-# Calculate dose level for each subgroup
-def initialize_dose_label(p_true_val, a0):
-    x = (p_true_val ** (1. / a0) * 2. - 1.)
-    return 1./2. * np.log((1. + x)/(1. - x))
 
 def get_toxicity(dose_label, a):
     return ((np.tanh(dose_label) + 1.) / 2.)**a
@@ -161,50 +158,5 @@ def gradient_ascent_update(old_alpha, learning_rate, K, subgroup_idx, dose_label
     new_alpha = old_alpha + learning_rate * gradient
     return new_alpha
 
-def get_toxicity_two_param_model(dose_label, alpha, beta):
-    return (np.exp(alpha + dose_label * np.exp(beta)))/(1 + np.exp(alpha + dose_label * np.exp(beta)))
-
-def get_toxicity_two_param_model_alpha_gradient(a, b, dose_labels, K, subgroup_idx, n_choose, n_tox):
-    '''
-    Gradient of the log likelihood of toxicity (based on two parameter model) with respect to a
-    n_choose = N_k
-    n_tox = n_k
-    '''
-    total_output = 0
-    for k in range(K):
-        N_k = n_choose[subgroup_idx, k]
-        n_k = n_tox[subgroup_idx, k]
-        u_k = dose_labels[k]
-        prob_tox = get_toxicity_two_param_model(u_k, a, b)
-        denom = np.exp(a + u_k * np.exp(b)) + 1.
-        output = (N_k / denom) + n_k - N_k
-        # if prob_tox == 1:
-        #     output = 0.01
-        total_output += output
-    return total_output
 
 
-def get_toxicity_two_param_model_beta_gradient(a, b, dose_labels, K, subgroup_idx, n_choose, n_tox):
-    '''
-    Gradient of the log likelihood of toxicity (based on two parameter model) with respect to b
-    '''
-    total_output = 0
-    for k in range(K):
-        N_k = n_choose[subgroup_idx, k]
-        n_k = n_tox[subgroup_idx, k]
-        u_k = dose_labels[k]
-        prob_tox = get_toxicity_two_param_model(u_k, a, b)
-        output = u_k * np.exp(b) * (n_k - N_k * prob_tox)
-        # if prob_tox == 1:
-        #     output = 0.01
-        total_output += output
-    return total_output
-
-
-def gradient_ascent_two_param_update(old_a, old_b, learning_rate, dose_labels, K, subgroup_idx, n_choose, n_tox):
-    gradient_a = get_toxicity_two_param_model_alpha_gradient(old_a, old_b, dose_labels, K, subgroup_idx, n_choose, n_tox)
-    gradient_b = get_toxicity_two_param_model_beta_gradient(old_a, old_b, dose_labels, K, subgroup_idx, n_choose, n_tox)
-
-    new_a = old_a + learning_rate * gradient_a
-    new_b = old_a + learning_rate + gradient_b
-    return new_a, new_b
