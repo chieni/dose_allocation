@@ -342,6 +342,48 @@ class TwoParamSharedModel(DoseFindingModel):
         return total_output
 
 
+class TwoParamAllSharedModel(TwoParamSharedModel):
+    '''
+    Two parameter model with all parameters shared (subgroups not trained separately)
+    '''
+    def __init__(self, time_horizon, num_subgroups, num_doses, patients, learning_rate, a0=0.5, b0=0.5):
+        super().__init__(time_horizon, num_subgroups, num_doses, patients, learning_rate, a0, b0)
+        self.current_a_hat = self.a0
+        self.current_b_hat = self.b0
+
+    def get_available_dose_set(self, dose_labels, subgroup_idx, tox_thre):
+        return self.get_toxicity_helper(dose_labels[subgroup_idx, :], self.current_a_hat, self.current_b_hat) <= tox_thre
+
+    def update_model_toxicity_estimate(self, dose_labels):
+        for s in range(self.num_subgroups):
+            self.model_toxicity_estimate[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat, self.current_b_hat)
+
+    def update_params(self, subgroup_idx, dose_labels):
+        old_a = self.current_a_hat
+        old_b = self.current_b_hat
+        subgroup_dose_labels = dose_labels[subgroup_idx, :]
+
+        gradient_a = self._get_toxicity_two_param_model_alpha_gradient(old_a, old_b, subgroup_dose_labels, subgroup_idx)
+        gradient_b = self._get_toxicity_two_param_model_beta_gradient(old_a, old_b, subgroup_dose_labels, subgroup_idx)
+
+        new_a = old_a + self.learning_rate * gradient_a
+        new_b = old_a + self.learning_rate + gradient_b
+
+        # TODO: Put bounds on b?
+        if new_a > self.a_max:
+            new_a = self.a_max
+        if new_a < 0:
+            new_a = 0.01
+
+        if new_b > self.a_max:
+            new_b = self.a_max
+        if new_b < 0:
+            new_b = 0.01
+        
+        self.current_a_hat = new_a
+        self.current_b_hat = new_b
+
+
 class TwoParamModel(TwoParamSharedModel):
     '''
     Two parameter contextual model
@@ -443,8 +485,28 @@ class TanhModel(DoseFindingModel):
         return 1./2. * np.log((1. + x)/(1. - x))
 
     def get_toxicity(dose_label, alpha):
-        print(dose_label, alpha)
         return ((np.tanh(dose_label) + 1.) / 2.) ** alpha
+
+    def plot_dose_toxicity_curve(dose_labels, p_true, a_hat_fin, p_empirical):
+        num_reps = a_hat_fin.shape[0]
+        num_doses = dose_labels.shape[0]
+        model_toxicities = np.array([TanhModel.get_toxicity(dose_labels, a_hat_fin[i]) for i in range(num_reps)]).flatten()
+        frame = pd.DataFrame({'trial': np.repeat(np.arange(num_reps), num_doses),
+                            'dose_labels': np.tile(dose_labels, num_reps), 
+                            'model': model_toxicities,
+                            'empirical': p_empirical.flatten('F')})
+        frame = pd.melt(frame, id_vars=['trial', 'dose_labels'], var_name='toxicity', value_name='toxicity_value')
+
+        true_frame = pd.DataFrame({'trial': np.repeat(0, num_doses),
+                                'dose_labels': dose_labels,
+                                'toxicity': np.repeat('true', num_doses),
+                                'toxicity_value': p_true})
+        frame = pd.concat([frame, true_frame])
+        sns.lineplot(data=frame, x='dose_labels', y='toxicity_value', hue='toxicity', style='toxicity', markers=True)
+        plt.xlim(-5, 0)
+        plt.ylim(0, 1)
+        plt.xlabel('Dose labels')
+        plt.ylabel('Toxicity')
 
     def get_toxicity_helper(self, dose_label, alpha, beta=None):
         return TanhModel.get_toxicity(dose_label, alpha)
@@ -494,7 +556,7 @@ class TanhModel(DoseFindingModel):
 class OGTanhModel(TanhModel):
     '''
     One parameter tanh model from O'Quigley
-    Contextual, no budget version with gradient
+    Contextual, no budget version without gradient
     ''' 
 
     def __init__(self, time_horizon, num_subgroups, num_doses, patients, learning_rate, a0=0.5):

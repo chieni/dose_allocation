@@ -43,7 +43,7 @@ class ExperimentRunner:
         return patients
 
 
-    def print_results(self, a_hat_fin_mean, out_metrics):
+    def print_results(self, out_metrics):
         num_patients = out_metrics.total_cum_eff.shape[0]
         efficacy = out_metrics.total_cum_eff[-1, :].mean()
         toxicity = out_metrics.total_cum_tox[-1, :].mean()
@@ -56,29 +56,10 @@ class ExperimentRunner:
                                       'toxicity by person': list(out_metrics.cum_tox_by_person.mean(axis=1)) + [toxicity / num_patients],
                                       'final dose error': list(out_metrics.rec_err.mean(axis=1)) + [out_metrics.rec_err.mean()]}).T
         print(metrics_frame)
+        print(f"a: {out_metrics.a_hat_fin.mean(axis=1)}")
+        print(f"b: {out_metrics.b_hat_fin.mean(axis=1)}")
 
     def make_plots(self, dose_labels, out_metrics):
-        plt.figure(figsize=(10, 8))
-        sns.set_theme()
-
-        # Subgroup plots
-        # Dose toxicity for contextual model
-        plt.subplot(331)
-        subgroup_index = 0
-        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], out_metrics.a_hat_fin[subgroup_index, :],
-                                        out_metrics.b_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-        
-        plt.subplot(332)
-        subgroup_index = 1
-        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], out_metrics.a_hat_fin[subgroup_index, :],
-                                        out_metrics.b_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-        
-        plt.subplot(333)
-        subgroup_index = 2
-        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], out_metrics.a_hat_fin[subgroup_index, :],
-                                        out_metrics.b_hat_fin[subgroup_index, :], out_metrics.p_hat[subgroup_index, :, :])
-        
-
         plt.subplot(334)
         self.plot_over_time(self.reps, self.num_subgroups, self.num_patients, out_metrics.total_eff_regret, out_metrics.eff_regret, 'Regret')
 
@@ -171,7 +152,7 @@ class ExperimentRunner:
         plt.xlabel('Subgroup')
         plt.ylabel('Metric per Person')
 
-    def run_two_param(self, a0, b0):
+    def run_two_param(self, model_type, a0, b0):
         dose_skeleton = np.mean(self.p_true, axis=0)
         dose_skeleton_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
 
@@ -186,7 +167,7 @@ class ExperimentRunner:
                 p_rec[pats[tau], tau:, i] += 1
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
                 
-            model = TwoParamSharedModel(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0, b0)
+            model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0, b0)
             for s in range(self.num_subgroups):
                 #dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(p_true[s, :], a0, b0)
                 dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(dose_skeleton, a0, b0)
@@ -196,10 +177,30 @@ class ExperimentRunner:
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
 
-        a_hat_fin_mean = np.mean(exp_metrics.a_hat_fin, axis=1)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
 
-        self.print_results(a_hat_fin_mean, exp_metrics)
+        self.print_results(exp_metrics)
+        plt.figure(figsize=(10, 8))
+        sns.set_theme()
+
+        # Subgroup plots
+        # Dose toxicity for contextual model
+        plt.subplot(331)
+        subgroup_index = 0
+        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                        exp_metrics.b_hat_fin[subgroup_index, :], exp_metrics.p_hat[subgroup_index, :, :])
+        
+        plt.subplot(332)
+        subgroup_index = 1
+        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                        exp_metrics.b_hat_fin[subgroup_index, :], exp_metrics.p_hat[subgroup_index, :, :])
+        
+        plt.subplot(333)
+        subgroup_index = 2
+        TwoParamSharedModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                        exp_metrics.b_hat_fin[subgroup_index, :], exp_metrics.p_hat[subgroup_index, :, :])
+        
+
         self.make_plots(dose_labels, exp_metrics)
     
     def run_one_param(self, model_type, a0):
@@ -226,11 +227,30 @@ class ExperimentRunner:
             metrics_objects.append(run_metrics)
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
-
-        a_hat_fin_mean = np.mean(exp_metrics.a_hat_fin, axis=1)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
 
-        self.print_results(a_hat_fin_mean, exp_metrics)
+        self.print_results(exp_metrics)
+        plt.figure(figsize=(10, 8))
+        sns.set_theme()
+
+        # Subgroup plots
+        # Dose toxicity for contextual model
+        plt.subplot(331)
+        subgroup_index = 0
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                           exp_metrics.p_hat[subgroup_index, :, :])
+        
+        plt.subplot(332)
+        subgroup_index = 1
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                          exp_metrics.p_hat[subgroup_index, :, :])
+        
+        plt.subplot(333)
+        subgroup_index = 2
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+                                           exp_metrics.p_hat[subgroup_index, :, :])
+        
+
         self.make_plots(dose_labels, exp_metrics)
 
 
@@ -260,10 +280,11 @@ def main():
 
     # a0 = 0.1
     # b0 = 0.1
-    # runner.run_two_param(a0, b0)
+    # runner.run_two_param(TwoParamAllSharedModel, a0, b0)
 
-    a0 = 0.5
-    runner.run_one_param(OGTanhModel, a0)
+    a0 = 1 / np.e
+    runner.run_one_param(TanhModel, a0)
+    #runner.run_one_param(OGTanhModel, a0)
 
 if __name__ == "__main__":
     main()
