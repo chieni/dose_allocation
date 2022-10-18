@@ -8,7 +8,7 @@ import seaborn as sns
 
 from helpers import alpha_func, get_ucb
 from metrics import TrialMetrics
-
+from parameterized_models import OQuiqleyModel
 
 class DoseFindingModel:
     def __init__(self, time_horizon, num_subgroups, num_doses, patients, learning_rate):
