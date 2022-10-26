@@ -13,12 +13,33 @@ import seaborn as sns
 class DoseFindingScenario:
     def __init__(self, dose_levels, toxicity_probs, efficacy_probs, optimal_doses,
                  toxicity_threshold, efficacy_threshold):
+        self.num_doses = len(dose_levels)
         self.dose_levels = dose_levels
         self.toxicity_probs = toxicity_probs
         self.efficacy_probs = efficacy_probs
         self.optimal_doses = optimal_doses
         self.toxicity_threshold = toxicity_threshold
         self.efficacy_threshold = efficacy_threshold
+
+    def plot_true_curves(self):
+        dose_labels = self.dose_levels
+        toxicity_probs = self.toxicity_probs
+        efficacy_probs = self.efficacy_probs
+        if efficacy_probs is None:
+            frame = pd.DataFrame({'dose_labels': dose_labels,
+                                'toxicity_prob': toxicity_probs})
+        else:
+            frame = pd.DataFrame({'dose_labels': dose_labels,
+                                'toxicity_prob': toxicity_probs,
+                                'efficacy_prob': efficacy_probs })
+        frame = pd.melt(frame, id_vars=['dose_labels'], var_name='response', value_name='probability')
+
+        sns.set()
+        sns.lineplot(data=frame, x='dose_labels', y='probability', hue='response',style='response', markers=True)
+        plt.ylim(0, 1)
+        plt.xlabel('Dose Labels')
+        plt.ylabel('Response')
+        plt.show()
 
     def get_efficacy_prob(self, arm_idx, subgroup_idx=0):
         if len(self.efficacy_probs.shape) == 1:
@@ -30,11 +51,19 @@ class DoseFindingScenario:
             return self.toxicity_probs[arm_idx]
         return self.toxicity_probs[subgroup_idx][arm_idx]
 
-    def sample_efficacay_event(self, arm_idx, subgroup_idx=0):
+    def sample_efficacy_event(self, arm_idx, subgroup_idx=0):
         return np.random.rand() <= self.get_efficacy_prob(arm_idx, subgroup_idx)
 
     def sample_toxicity_event(self, arm_idx, subgroup_idx=0):
-        return np.random.rand() <= self.get_toxicity_prob(arm_idx.subgroup_idx)
+        return np.random.rand() <= self.get_toxicity_prob(arm_idx, subgroup_idx)
+    
+    def generate_toxicity_data(self, selected_arms):
+        events = np.array([self.sample_toxicity_event(arm_idx) for arm_idx in selected_arms], dtype=int)
+        return events
+
+    def generate_efficacy_data(self, selected_arms):
+        events = np.array([self.sample_efficacy_event(arm_idx) for arm_idx in selected_arms], dtype=int)
+        return events
 
 
 class DoseFindingScenarios:
@@ -43,7 +72,8 @@ class DoseFindingScenarios:
     '''
     @staticmethod
     def oquigley_model_example():
-        toxicity_probs = np.array([0.15, 0.2, 0.3, 0.6, 0.9])
+
+        toxicity_probs = np.array([0.15, 0.2, 0.3, 0.55, 0.8])
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
         model = OQuiqleyModel(0.5)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
@@ -450,11 +480,10 @@ class DoseFindingScenarios:
     
 
 class TrialPopulation:
-    def __init__(self, num_patients, arrival_rate):
-        self.num_patients = num_patients
+    def __init__(self, arrival_rate=None):
         self.arrival_rate = arrival_rate
         
-    def gen_patients(self):
+    def generate_samples(self, num_patients):
         '''
         Generates all patients for an experiment of length T.
         Completely synthetic, patients from len(arr_rate) number of subgroups.
@@ -463,47 +492,27 @@ class TrialPopulation:
         '''
         # Arrival proportion of each subgroup. If arrive_rate = [5, 4, 3],
         # arrive_dist = [5/12, 4/12, 3/12]
-        arrive_sum = sum(self.arrival_rate)
-        arrive_dist = [rate/arrive_sum for rate in self.arrival_rate]
-        arrive_dist.insert(0, 0)
+        if self.arrival_rate is not None:
+            arrive_sum = sum(self.arrival_rate)
+            arrive_dist = [rate/arrive_sum for rate in self.arrival_rate]
+            arrive_dist.insert(0, 0)
 
-        # [0, 5/12, 9/12, 12/12]
-        arrive_dist_bins = np.cumsum(arrive_dist)
+            # [0, 5/12, 9/12, 12/12]
+            arrive_dist_bins = np.cumsum(arrive_dist)
 
-        # Random numbers between 0 and 1 in an array of shape (1, T)
-        patients_gen = np.random.rand(self.num_patients)
-        patients = np.digitize(patients_gen, arrive_dist_bins) - 1
-        return patients
+            # Random numbers between 0 and 1 in an array of shape (1, T)
+            patients_gen = np.random.rand(num_patients)
+            return np.digitize(patients_gen, arrive_dist_bins) - 1
+        return np.zeros(num_patients)
 
         
 class TrialPopulationScenarios:
     @staticmethod
-    def lee_trial_population(num_patients):
+    def homogenous_population():
+        return TrialPopulation(None)
+    
+    @staticmethod
+    def lee_trial_population():
         arr_rate = [5, 4, 3]
-        return TrialPopulation(num_patients, arr_rate)
+        return TrialPopulation(arr_rate)
 
-
-def plot_true_curves(dose_finding_scenario):
-    dose_labels = dose_finding_scenario.dose_levels
-    toxicity_probs = dose_finding_scenario.toxicity_probs
-    efficacy_probs = dose_finding_scenario.efficacy_probs
-    if efficacy_probs is None:
-        frame = pd.DataFrame({'dose_labels': dose_labels,
-                            'toxicity_prob': toxicity_probs})
-    else:
-        frame = pd.DataFrame({'dose_labels': dose_labels,
-                            'toxicity_prob': toxicity_probs,
-                            'efficacy_prob': efficacy_probs })
-    frame = pd.melt(frame, id_vars=['dose_labels'], var_name='response', value_name='probability')
-
-    sns.set()
-    sns.lineplot(data=frame, x='dose_labels', y='probability', hue='response',style='response', markers=True)
-    plt.ylim(0, 1)
-    plt.xlabel('Dose Labels')
-    plt.ylabel('Response')
-    plt.show()
-
-
-
-scenario = DoseFindingScenarios.oquigley_model_example()
-plot_true_curves(scenario)
