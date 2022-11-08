@@ -11,10 +11,10 @@ import seaborn as sns
 # Use generated examples from common parameterized dose-tox curves
 
 class DoseFindingScenario:
-    def __init__(self, dose_levels, toxicity_probs, efficacy_probs, optimal_doses,
+    def __init__(self, dose_labels, toxicity_probs, efficacy_probs, optimal_doses,
                  toxicity_threshold, efficacy_threshold):
-        self.num_doses = len(dose_levels)
-        self.dose_levels = dose_levels
+        self.num_doses = len(dose_labels)
+        self.dose_labels = dose_labels
         self.toxicity_probs = toxicity_probs
         self.efficacy_probs = efficacy_probs
         self.optimal_doses = optimal_doses
@@ -22,7 +22,7 @@ class DoseFindingScenario:
         self.efficacy_threshold = efficacy_threshold
 
     def plot_true_curves(self):
-        dose_labels = self.dose_levels
+        dose_labels = self.dose_labels
         toxicity_probs = self.toxicity_probs
         efficacy_probs = self.efficacy_probs
         if efficacy_probs is None:
@@ -72,12 +72,11 @@ class DoseFindingScenarios:
     '''
     @staticmethod
     def oquigley_model_example():
-
         toxicity_probs = np.array([0.15, 0.2, 0.3, 0.55, 0.8])
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
         model = OQuiqleyModel(0.5)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
-        optimal_doses = np.array([1])
+        optimal_doses = np.array([2])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
     
@@ -98,7 +97,7 @@ class DoseFindingScenarios:
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
         model = PowerModel(0.5)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
-        optimal_doses = np.array([1])
+        optimal_doses = np.array([2])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
     
@@ -109,7 +108,7 @@ class DoseFindingScenarios:
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
         model = OneParamLogisticModel(0.5)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
-        optimal_doses = np.array([1])
+        optimal_doses = np.array([2])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
     
@@ -120,7 +119,7 @@ class DoseFindingScenarios:
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
         model = TwoParamLogisticModel(0.1, 0.1)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
-        optimal_doses = np.array([1])
+        optimal_doses = np.array([2])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
     
@@ -480,7 +479,8 @@ class DoseFindingScenarios:
     
 
 class TrialPopulation:
-    def __init__(self, arrival_rate=None):
+    def __init__(self, num_subgroups, arrival_rate=None):
+        self.num_subgroups = num_subgroups
         self.arrival_rate = arrival_rate
         
     def generate_samples(self, num_patients):
@@ -509,10 +509,10 @@ class TrialPopulation:
 class TrialPopulationScenarios:
     @staticmethod
     def homogenous_population():
-        return TrialPopulation(None)
+        return TrialPopulation(1, None)
     
     @staticmethod
     def lee_trial_population():
         arr_rate = [5, 4, 3]
-        return TrialPopulation(arr_rate)
+        return TrialPopulation(3, arr_rate)
 

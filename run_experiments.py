@@ -7,48 +7,23 @@ import seaborn as sns
 
 from metrics import ExperimentMetrics
 from dose_finding_models import TwoParamSharedModel, TanhModel, TwoParamModel, TwoParamAllSharedModel, OGTanhModel
+from data_generation import TrialPopulationScenarios, DoseFindingScenarios
 
 
 np.random.seed(0)
 class ExperimentRunner:
-    def __init__(self, reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate):
+    def __init__(self, reps, patient_scenario, dose_scenario, num_patients, learning_rate):
         self.reps = reps
-        self.num_doses = num_doses
+        self.patient_scenario = patient_scenario
+        self.dose_scenario = dose_scenario
         self.num_patients = num_patients
-        self.num_subgroups = num_subgroups
-        self.arr_rate = arr_rate
-        self.tox_thre = tox_thre
-        self.eff_thre = eff_thre
-        self.p_true = p_true
-        self.q_true = q_true
-        self.opt = opt
         self.learning_rate = learning_rate
-
-    def gen_patients(self):
-        '''
-        Generates all patients for an experiment of length T
-        '''
-        # Arrival proportion of each subgroup. If arrive_rate = [5, 4, 3],
-        # arrive_dist = [5/12, 4/12, 3/12]
-        arrive_sum = sum(self.arr_rate)
-        arrive_dist = [rate/arrive_sum for rate in self.arr_rate]
-        arrive_dist.insert(0, 0)
-
-        # [0, 5/12, 9/12, 12/12]
-        arrive_dist_bins = np.cumsum(arrive_dist)
-
-        # Random numbers between 0 and 1 in an array of shape (1, T)
-        patients_gen = np.random.rand(self.num_patients)
-        patients = np.digitize(patients_gen, arrive_dist_bins) - 1
-        return patients
-
 
     def print_results(self, out_metrics):
         num_patients = out_metrics.total_cum_eff.shape[0]
         efficacy = out_metrics.total_cum_eff[-1, :].mean()
         toxicity = out_metrics.total_cum_tox[-1, :].mean()
-
-        metrics_frame = pd.DataFrame({'subgroup': list(np.arange(3)) + ['overall'],
+        metrics_frame = pd.DataFrame({'subgroup': list(np.arange(self.patient_scenario.num_subgroups)) + ['overall'],
                                       'dose error by person': list(out_metrics.regret_by_person.mean(axis=1)) + [out_metrics.regret[:, -1, :].sum(axis=0).mean() / num_patients], # incorrect dose assignments
                                       'efficacy regret': list(out_metrics.eff_regret[:, -1, :].mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean()],
                                       'efficacy regret by person': list(out_metrics.eff_regret_by_person.mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean() / num_patients],
@@ -61,13 +36,13 @@ class ExperimentRunner:
 
     def make_plots(self, dose_labels, out_metrics):
         plt.subplot(334)
-        self.plot_over_time(self.reps, self.num_subgroups, self.num_patients, out_metrics.total_eff_regret, out_metrics.eff_regret, 'Regret')
+        self.plot_over_time(self.reps, self.patient_scenario.num_subgroups, self.num_patients, out_metrics.total_eff_regret, out_metrics.eff_regret, 'Regret')
 
         plt.subplot(335)
-        self.plot_over_time(self.reps, self.num_subgroups, self.num_patients, out_metrics.total_cum_eff, out_metrics.cum_eff, 'Efficacy')
+        self.plot_over_time(self.reps, self.patient_scenario.num_subgroups, self.num_patients, out_metrics.total_cum_eff, out_metrics.cum_eff, 'Efficacy')
 
         plt.subplot(336)
-        self.plot_over_time(self.reps, self.num_subgroups, self.num_patients, out_metrics.total_cum_tox, out_metrics.cum_tox, 'Toxicity')
+        self.plot_over_time(self.reps, self.patient_scenario.num_subgroups, self.num_patients, out_metrics.total_cum_tox, out_metrics.cum_tox, 'Toxicity')
 
         plt.subplot(337)
         self.plot_outcome(out_metrics.regret_by_person, 'Dose Error')
@@ -116,7 +91,7 @@ class ExperimentRunner:
         frame['all'] = mean_frame
         frame = frame.reset_index()
         frame = pd.melt(frame, id_vars=['index'], var_name='group', value_name=value_name)
-        sns.pointplot(x='group', y=value_name, data=frame, join=False, kind='point')
+        sns.pointplot(x='group', y=value_name, data=frame, join=False)
         plt.ylim(0, 1.0)
         plt.xlabel('Subgroup')
         plt.ylabel(value_name)
@@ -148,7 +123,7 @@ class ExperimentRunner:
 
         final_frame = pd.concat([frame, tox_frame])
 
-        sns.pointplot(x='group', y='Metric per Person', hue='metric', data=final_frame, join=False, kind='point')
+        sns.pointplot(x='group', y='Metric per Person', hue='metric', data=final_frame, join=False)
         plt.xlabel('Subgroup')
         plt.ylabel('Metric per Person')
 
@@ -162,7 +137,7 @@ class ExperimentRunner:
         for i in range(self.reps):
             print(f"Trial: {i}")
             # patients arrival generation
-            pats = self.gen_patients()
+            pats = self.patient_scenario.generate_samples(self.num_patients)
             for tau in range(self.num_patients):
                 p_rec[pats[tau], tau:, i] += 1
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
@@ -204,29 +179,22 @@ class ExperimentRunner:
         self.make_plots(dose_labels, exp_metrics)
     
     def run_one_param(self, model_type, a0):
-        dose_skeleton = np.mean(self.p_true, axis=0)
-        dose_skeleton_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
-
-        p_rec = np.zeros((self.num_subgroups, self.num_patients, self.reps))
         metrics_objects = []
 
         for i in range(self.reps):
             print(f"Trial: {i}")
-            # patients arrival generation
-            pats = self.gen_patients()
-            for tau in range(self.num_patients):
-                p_rec[pats[tau], tau:, i] += 1
-            dose_labels = np.zeros((self.num_subgroups, self.num_doses))
+            pats = self.patient_scenario.generate_samples(self.num_patients)
+            dose_labels = np.zeros((self.patient_scenario.num_subgroups, self.dose_scenario.num_doses))
                 
-            model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
-            for s in range(self.num_subgroups):
-                #dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(p_true[s, :], a0, b0)
-                dose_labels[s, :] = TanhModel.initialize_dose_label(dose_skeleton, a0)
-        
-            run_metrics = model.run_model(self.tox_thre, self.eff_thre, self.p_true, self.q_true, self.opt, dose_labels)
+            for s in range(self.patient_scenario.num_subgroups):
+                dose_labels[s, :] = self.dose_scenario.dose_labels
+
+            model = model_type(self.num_patients, self.patient_scenario.num_subgroups, self.dose_scenario.num_doses, pats, self.learning_rate, a0)
+            run_metrics = model.run_model(self.dose_scenario, dose_labels)
             metrics_objects.append(run_metrics)
         
-        exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
+        exp_metrics = ExperimentMetrics(self.patient_scenario.num_subgroups, self.dose_scenario.num_doses,
+                                        self.num_patients, self.reps, metrics_objects)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
 
         self.print_results(exp_metrics)
@@ -237,17 +205,17 @@ class ExperimentRunner:
         # Dose toxicity for contextual model
         plt.subplot(331)
         subgroup_index = 0
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
                                            exp_metrics.p_hat[subgroup_index, :, :])
         
         plt.subplot(332)
         subgroup_index = 1
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
                                           exp_metrics.p_hat[subgroup_index, :, :])
         
         plt.subplot(333)
         subgroup_index = 2
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
                                            exp_metrics.p_hat[subgroup_index, :, :])
         
 
@@ -256,35 +224,27 @@ class ExperimentRunner:
 
 def main():
     reps = 100 # num of simulated trials
-    num_doses = 6
-    num_patients = 30
-    num_subgroups = 3
-    arr_rate = [5, 4, 3]
-    tox_thre = 0.35 # toxicity threshold
-    eff_thre = 0.2 # efficacy threshold
+    num_patients = 50
     learning_rate = 0.01
-
-    # p and q true value
-    # toxicity
-    p_true = np.array([[0.01, 0.01, 0.05, 0.15, 0.20, 0.45],
-                    [0.01, 0.05, 0.15, 0.20, 0.45, 0.60],
-                    [0.01, 0.05, 0.15, 0.20, 0.45, 0.60]])
-    # efficacy
-    q_true = np.array([[0.01, 0.02, 0.05, 0.10, 0.10, 0.10],
-                    [0.10, 0.20, 0.30, 0.50, 0.60, 0.65],
-                    [0.20, 0.50, 0.60, 0.80, 0.84, 0.85]])
-    # optimal doses
-    opt = np.array([6, 3, 3])
+    patient_scenario = TrialPopulationScenarios.lee_trial_population()
+    dose_scenario = DoseFindingScenarios.lee_synthetic_example()
             
-    runner = ExperimentRunner(reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate)
-
-    # a0 = 0.1
-    # b0 = 0.1
-    # runner.run_two_param(TwoParamAllSharedModel, a0, b0)
+    runner = ExperimentRunner(reps, patient_scenario, dose_scenario, num_patients, learning_rate)
 
     a0 = 1 / np.e
-    runner.run_one_param(TanhModel, a0)
-    #runner.run_one_param(OGTanhModel, a0)
+    runner.run_one_param(OGTanhModel, a0)
+
+def main2():
+    reps = 100 # num of simulated trials
+    num_patients = 50
+    learning_rate = 0.01
+    patient_scenario = TrialPopulationScenarios.homogenous_population()
+    dose_scenario = DoseFindingScenarios.oquigley_model_example()
+            
+    runner = ExperimentRunner(reps, patient_scenario, dose_scenario, num_patients, learning_rate)
+
+    a0 = 1 / np.e
+    runner.run_one_param(OGTanhModel, a0)
 
 if __name__ == "__main__":
-    main()
+    main2()
