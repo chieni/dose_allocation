@@ -138,8 +138,11 @@ class CRM:
         plt.show()
 
 def main():
-    patient_scenario = TrialPopulationScenarios.lee_trial_population()
-    dose_scenario = DoseFindingScenarios.lee_synthetic_example()
+    # patient_scenario = TrialPopulationScenarios.lee_trial_population()
+    # dose_scenario = DoseFindingScenarios.lee_synthetic_example()
+
+    dose_scenario = DoseFindingScenarios.oquigley_model_example()
+    patient_scenario = TrialPopulationScenarios.homogenous_population()
     num_patients = 12
     crm = CRM(num_patients)
     patients = patient_scenario.generate_samples(num_patients)

@@ -4,6 +4,7 @@ import torch
 import gpytorch
 import tqdm
 import seaborn as sns
+import pandas as pd
 import matplotlib.pyplot as plt
 
 from data_generation import DoseFindingScenarios, TrialPopulationScenarios
@@ -16,6 +17,52 @@ class PosteriorDist:
         self.mean = mean
         self.lower = lower
         self.upper = upper
+
+
+class DoseExperimentMetrics:
+    def __init__(self, num_samples, total_toxicity, total_efficacy,
+                 selected_doses, optimal_doses, final_dose_error):
+        self.num_samples = num_samples
+        self.total_toxicity = total_toxicity
+        self.total_efficacy = total_efficacy
+
+        self.toxicity_per_person = total_toxicity / num_samples
+        self.efficacy_per_person = total_efficacy / num_samples
+
+        self.dose_selections = np.array(np.unique(selected_doses, return_counts=True)).T
+        self.dose_error_per_person = self.calculate_dose_error(selected_doses, optimal_doses, patients=None) / num_samples
+
+        self.final_dose_error = final_dose_error
+    
+    @classmethod
+    def print_merged_metrics(cls, metrics_list):
+        toxicity_per_person = np.mean([metric.toxicity_per_person for metric in metrics_list])
+        efficacy_per_person = np.mean([metric.efficacy_per_person for metric in metrics_list])
+        dose_error_per_person = np.mean([metric.dose_error_per_person for metric in metrics_list])
+        final_dose_error = np.mean([metric.final_dose_error for metric in metrics_list])
+        metrics_frame = pd.DataFrame({
+            'toxicity per person': [toxicity_per_person],
+            'efficacy per person': [efficacy_per_person],
+            'dose error per person': [dose_error_per_person],
+            'final dose error': final_dose_error
+        })
+        print(metrics_frame)
+        
+
+    def calculate_dose_error(self, selected_doses, optimal_doses, patients):
+        return np.sum(selected_doses != optimal_doses[0])
+    
+    def print_metrics(self):
+        metrics_frame = pd.DataFrame({
+            'toxicity per person': [self.toxicity_per_person],
+            'efficacy per person': [self.efficacy_per_person],
+            'dose error per person': [self.dose_error_per_person],
+            'final dose error': self.final_dose_error
+        })
+
+        print(metrics_frame)
+        print("Dose allocations")
+        print(self.dose_selections)
 
 
 class DoseFindingExperiment:
@@ -46,7 +93,7 @@ class DoseFindingExperiment:
         eff_y = torch.tensor(efficacy_data.astype(np.float32))
         train_y = torch.stack([tox_y, eff_y], -1)
 
-        return patients, train_x, train_y, test_x
+        return patients, selected_arms, train_x, train_y, test_x
 
     def select_dose(self, tox_mean, eff_mean):
         safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
@@ -54,6 +101,8 @@ class DoseFindingExperiment:
         return selected_dose
 
     def select_final_dose(self, tox_mean, eff_mean):
+        print(f"Toxicity: {tox_mean.numpy()}")
+        print(f"Efficacy: {eff_mean.numpy()}")
         dose_error = np.zeros(self.patient_scenario.num_subgroups)
         dose_rec = self.dose_scenario.num_doses
         
@@ -106,7 +155,6 @@ class DoseFindingExperiment:
         sns.set()
         mean = np.mean(rep_means, axis=0)
         ci = 1.96 * np.std(rep_means, axis=0) / np.sqrt(rep_means.shape[0])
-        
         ax.plot(test_x, mean, 'b-', marker='o', label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')
         ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
@@ -142,72 +190,40 @@ class DoseFindingExperiment:
         return PosteriorDist(test_x, mean, lower, upper)
 
 
-def dose_example(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+def dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, show_plot=True):
     inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
     
-    patients, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
+    patients, selected_arms, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
     tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
-                                          train_y[:, 0], train_y[:, 1], test_x,
-                                          num_confidence_samples)
+                                                     train_y[:, 0], train_y[:, 1], test_x,
+                                                     num_confidence_samples)
 
-    dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-    experiment.plot_gp_results(train_x.numpy(), train_y[:, 0].numpy(), train_y[:, 1].numpy(), tox_dist, eff_dist)
+    final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
+    experiment_metrics = DoseExperimentMetrics(num_samples, np.sum(train_y[:, 0].numpy()), np.sum(train_y[:, 1].numpy()),
+                                               selected_arms, dose_scenario.optimal_doses, final_dose_error)
+    if show_plot:
+        experiment_metrics.print_metrics()
+        experiment.plot_gp_results(train_x.numpy(), train_y[:, 0].numpy(), train_y[:, 1].numpy(), tox_dist, eff_dist)
+    return experiment_metrics, tox_dist, eff_dist
 
-def dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
-    inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
-
-    dose_error = np.zeros(patient_scenario.num_subgroups)
-    tox_means = np.empty((num_reps, inducing_points.shape[0]))
-    eff_means = np.empty((num_reps, inducing_points.shape[0]))
-
-    for rep in range(num_reps):
-        print(f"Trial {rep}")
-        patients, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
-        tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
-                                                         train_y[:, 0], train_y[:, 1], test_x,
-                                                         num_confidence_samples)
-        dose_error += experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-        tox_means[rep, :] = tox_dist.mean
-        eff_means[rep, :] = eff_dist.mean
-    
-    print(dose_error / num_reps)
-    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
-
-def multitask_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs,
-                           num_confidence_samples, num_latents, num_tasks, num_inducing_pts):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
-    patients, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
+def multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
+                           num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+                           show_plot=True):
+    _, selected_arms, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
     tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                      train_x, train_y, test_x, num_confidence_samples)
 
-    dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-    experiment.plot_gp_results(train_x.numpy(), train_y[:, 0].numpy(),
-                               train_y[:, 1].numpy(), tox_dist, eff_dist)
+    final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
+    experiment_metrics = DoseExperimentMetrics(num_samples, np.sum(train_y[:, 0].numpy()), np.sum(train_y[:, 1].numpy()),
+                                               selected_arms, dose_scenario.optimal_doses, final_dose_error)
+    if show_plot:
+        experiment_metrics.print_metrics()
+        experiment.plot_gp_results(train_x.numpy(), train_y[:, 0].numpy(), train_y[:, 1].numpy(), tox_dist, eff_dist)
+    return experiment_metrics, tox_dist, eff_dist
 
-def multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
-                                  num_confidence_samples, num_reps, num_latents, num_tasks,
-                                  num_inducing_pts):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
-    dose_error = np.zeros(patient_scenario.num_subgroups)
-    tox_means = np.empty((num_reps, num_inducing_pts))
-    eff_means = np.empty((num_reps, num_inducing_pts))
 
-    for rep in range(num_reps):
-        print(f"Trial {rep}")
-        patients, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
-        tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
-                                                         train_x, train_y, test_x, num_confidence_samples)
-        dose_error += experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-        tox_means[rep, :] = tox_dist.mean
-        eff_means[rep, :] = eff_dist.mean
-
-    print(dose_error / num_reps)
-    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
-
-def online_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+def online_dose_example(experiment, dose_scenario, num_samples, num_epochs,
+                        num_confidence_samples, cohort_size, show_plot=True):
     inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
 
     max_dose = 0
@@ -233,15 +249,15 @@ def online_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs
                                                          num_confidence_samples)
 
         selected_dose = experiment.select_dose(tox_dist.mean, eff_dist.mean)
-        # if selected_dose > max_dose + 1:
-        #     selected_dose = max_dose + 1
-        #     max_dose = selected_dose
+        if selected_dose > max_dose + 1:
+            selected_dose = max_dose + 1
+            max_dose = selected_dose
         print(f"Selected dose: {selected_dose}")
 
         selected_doses += [selected_dose for item in range(cohort_size)]
-        selected_dose_values += [dose_scenario.dose_labels[dose] for dose in selected_doses]
-        toxicity_responses += [dose_scenario.sample_toxicity_event(dose) for dose in selected_doses]
-        efficacy_responses += [dose_scenario.sample_efficacy_event(dose) for dose in selected_doses]
+        selected_dose_values += [dose_scenario.dose_labels[selected_dose] for item in range(cohort_size)]
+        toxicity_responses += [dose_scenario.sample_toxicity_event(selected_dose) for item in range(cohort_size)]
+        efficacy_responses += [dose_scenario.sample_efficacy_event(selected_dose) for item in range(cohort_size)]
 
         timestep += cohort_size
 
@@ -253,16 +269,19 @@ def online_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs
                                                      tox_train_y, eff_train_y, test_x,
                                                      num_confidence_samples)
 
-    print(np.array(np.unique(selected_doses, return_counts=True)).T)
-    dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-    experiment.plot_gp_results(train_x.numpy(), tox_train_y.numpy(),
-                               eff_train_y.numpy(), tox_dist, eff_dist)
+    final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
 
+    experiment_metrics = DoseExperimentMetrics(num_samples, np.sum(toxicity_responses), np.sum(efficacy_responses),
+                                               selected_doses, dose_scenario.optimal_doses, final_dose_error)
+    if show_plot:
+        experiment_metrics.print_metrics()
+        experiment.plot_gp_results(train_x.numpy(), tox_train_y.numpy(),
+                                eff_train_y.numpy(), tox_dist, eff_dist)
+    return experiment_metrics, tox_dist, eff_dist
 
-def online_multitask_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs,
+def online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
                                   num_confidence_samples, cohort_size, num_latents,
-                                  num_tasks, num_inducing_pts):
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+                                  num_tasks, num_inducing_pts, show_plot=True):
     max_dose = 0
     timestep = 0
 
@@ -284,7 +303,7 @@ def online_multitask_dose_example(dose_scenario, patient_scenario, num_samples, 
 
         tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                          train_x, train_y, test_x, num_confidence_samples)
-
+        print(f"Tox dist: {tox_dist.mean}")
         selected_dose = experiment.select_dose(tox_dist.mean, eff_dist.mean)
         if selected_dose > max_dose + 1:
             selected_dose = max_dose + 1
@@ -293,9 +312,9 @@ def online_multitask_dose_example(dose_scenario, patient_scenario, num_samples, 
 
         # Get responses
         selected_doses += [selected_dose for item in range(cohort_size)]
-        selected_dose_values += [dose_scenario.dose_labels[dose] for dose in selected_doses]
-        toxicity_responses += [dose_scenario.sample_toxicity_event(dose) for dose in selected_doses]
-        efficacy_responses += [dose_scenario.sample_efficacy_event(dose) for dose in selected_doses]
+        selected_dose_values += [dose_scenario.dose_labels[selected_dose] for item in range(cohort_size)]
+        toxicity_responses += [dose_scenario.sample_toxicity_event(selected_dose) for item in range(cohort_size)]
+        efficacy_responses += [dose_scenario.sample_efficacy_event(selected_dose) for item in range(cohort_size)]
 
         timestep += cohort_size
     
@@ -306,38 +325,140 @@ def online_multitask_dose_example(dose_scenario, patient_scenario, num_samples, 
 
     tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                      train_x, train_y, test_x, num_confidence_samples)
+    print(f"Tox dist: {tox_dist.mean}")
+    final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
+    experiment_metrics = DoseExperimentMetrics(num_samples, np.sum(toxicity_responses), np.sum(efficacy_responses),
+                                               selected_doses, dose_scenario.optimal_doses, final_dose_error)
+    
+    if show_plot:
+        experiment_metrics.print_metrics()
+        experiment.plot_gp_results(train_x.numpy(), tox_train_y.numpy(),
+                                   eff_train_y.numpy(), tox_dist, eff_dist)
 
-    print(np.array(np.unique(selected_doses, return_counts=True)).T)
-    dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-    experiment.plot_gp_results(train_x.numpy(), tox_train_y.numpy(),
-                             eff_train_y.numpy(), tox_dist, eff_dist)
+    return experiment_metrics, tox_dist, eff_dist
+
+
+# Experiments with multiple trials
+def dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps):
+    metrics = []
+    test_x = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
+    tox_means = np.empty((num_reps, test_x.shape[0]))
+    eff_means = np.empty((num_reps, test_x.shape[0]))
+
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+    
+    for trial in range(num_reps):
+        print(f"Trial {trial}")
+        trial_metrics, tox_dist, eff_dist = dose_example(experiment, dose_scenario,
+                                                         num_samples, num_epochs, num_confidence_samples,
+                                                         show_plot=False)
+        metrics.append(trial_metrics)
+        tox_means[trial, :] = tox_dist.mean
+        eff_means[trial, :] = eff_dist.mean
+    
+    DoseExperimentMetrics.print_merged_metrics(metrics)
+    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
+
+def multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                                  num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps):
+    metrics = []
+    test_x = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
+    tox_means = np.empty((num_reps, test_x.shape[0]))
+    eff_means = np.empty((num_reps, test_x.shape[0]))
+
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+    
+    for trial in range(num_reps):
+        print(f"Trial {trial}")
+        trial_metrics, tox_dist, eff_dist = multitask_dose_example(experiment, dose_scenario,
+                                                                   num_samples, num_epochs, num_confidence_samples,
+                                                                   num_latents, num_tasks, num_inducing_pts,
+                                                                   show_plot=False)
+        metrics.append(trial_metrics)
+        tox_means[trial, :] = tox_dist.mean
+        eff_means[trial, :] = eff_dist.mean
+    
+    DoseExperimentMetrics.print_merged_metrics(metrics)
+    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
+
+def online_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                               num_confidence_samples, cohort_size, num_reps):
+    metrics = []
+    test_x = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
+
+    tox_means = np.empty((num_reps, test_x.shape[0]))
+    eff_means = np.empty((num_reps, test_x.shape[0]))
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+    
+    for trial in range(num_reps):
+        print(f"Trial {trial}")
+        trial_metrics, tox_dist, eff_dist = online_dose_example(experiment, dose_scenario, num_samples, num_epochs,
+                                                                num_confidence_samples, cohort_size, show_plot=False)
+        metrics.append(trial_metrics)
+        tox_means[trial, :] = tox_dist.mean
+        eff_means[trial, :] = eff_dist.mean
+    
+    DoseExperimentMetrics.print_merged_metrics(metrics)
+    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
+
+
+def online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                                         num_confidence_samples, cohort_size, num_latents,
+                                         num_tasks, num_inducing_pts, num_reps):
+        
+    metrics = []
+    test_x = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
+    tox_means = np.empty((num_reps, test_x.shape[0]))
+    eff_means = np.empty((num_reps, test_x.shape[0]))
+
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+    
+    for trial in range(num_reps):
+        print(f"Trial {trial}")
+        trial_metrics, tox_dist, eff_dist = online_multitask_dose_example(experiment, dose_scenario, num_samples,
+                                                                          num_epochs, num_confidence_samples, cohort_size,
+                                                                          num_latents, num_tasks, num_inducing_pts, show_plot=False)
+        metrics.append(trial_metrics)
+        tox_means[trial, :] = tox_dist.mean
+        eff_means[trial, :] = eff_dist.mean
+    
+    DoseExperimentMetrics.print_merged_metrics(metrics)
+    experiment.plot_trial_gp_results(tox_means, eff_means, test_x)
 
 
 def main():
-    dose_scenario = DoseFindingScenarios.oquigley_model_example()
+    dose_scenario = DoseFindingScenarios.taka_synthetic_3()
     patient_scenario = TrialPopulationScenarios.homogenous_population()
-    num_samples = 24
-    num_epochs = 300
+    num_samples = 36
+    num_epochs = 500
     num_confidence_samples = 10000
 
     num_latents = 3
     num_tasks = 2
     num_inducing_pts = 5
 
-    #dose_example(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples)
-    # multitask_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples,
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+
+    # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
+    # multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples,
     #                        num_latents, num_tasks, num_inducing_pts)
 
-    num_reps = 10
-    #dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps)
-    # multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
-    #                               num_confidence_samples, num_reps, num_latents, num_tasks, num_inducing_pts)
 
     cohort_size = 3
-    #online_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
-    online_multitask_dose_example(dose_scenario, patient_scenario, num_samples, num_epochs,
-                                  num_confidence_samples, cohort_size, num_latents,
-                                  num_tasks, num_inducing_pts)
+    # online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
+    # online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
+    #                               num_confidence_samples, cohort_size, num_latents,
+    #                               num_tasks, num_inducing_pts)
+    
+    num_reps = 10
+    dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps)
+    # multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+    #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps)
+    # online_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+    #                            num_confidence_samples, cohort_size, num_reps)
+    # online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+    #                                      num_confidence_samples, cohort_size, num_latents,
+    #                                      num_tasks, num_inducing_pts, num_reps)
 
 
 main()

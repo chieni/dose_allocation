@@ -138,6 +138,7 @@ class DoseFindingModel:
         self.metrics.typeI = self.metrics.typeI / self.num_doses
         self.metrics.typeII = self.metrics.typeII / self.num_doses
         self.metrics.p_hat = self.empirical_toxicity_estimate
+        self.metrics.q_hat = self.empirical_efficacy_estimate
         self.metrics.pats_count = np.unique(self.patients, return_counts=True)[1]
         self.metrics.dose_err_by_person = self.metrics.rec_err / self.metrics.pats_count
         self.metrics.cum_eff_by_person = self.metrics.cum_eff[:, -1] / self.metrics.pats_count

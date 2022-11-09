@@ -9,6 +9,7 @@ class ExperimentMetrics:
         self.cum_tox = np.zeros((S, T, reps))
 
         self.p_hat = np.zeros((S, K, reps))
+        self.q_hat = np.zeros((S, K, reps))
         self.q_mse_reps = np.zeros((S, K, T, reps))
         self.total_eff_regret = np.zeros((T, reps))
         self.eff_regret = np.zeros((S, T, reps))
@@ -41,6 +42,7 @@ class ExperimentMetrics:
             self.cum_tox[:, :, idx] = trial_metric_obj.cum_tox
 
             self.p_hat[:, :, idx] = trial_metric_obj.p_hat
+            self.q_hat[:, :, idx] = trial_metric_obj.q_hat
             self.q_mse_reps[:, :, :, idx] = trial_metric_obj.q_mse
             self.total_eff_regret[:, idx] = trial_metric_obj.total_eff_regret
             self.eff_regret[:, :, idx] = trial_metric_obj.eff_regret
@@ -72,6 +74,7 @@ class TrialMetrics:
         self.cum_tox = np.zeros((S, T))
 
         self.p_hat = np.zeros((S, K)) # estimated toxicity
+        self.q_hat = np.zeros((S, K)) # estimated efficacy
         self.q_mse = np.zeros((S, K, T)) # mse of efficacy estimate
         self.total_eff_regret = np.zeros(T)
         self.eff_regret = np.zeros((S, T))

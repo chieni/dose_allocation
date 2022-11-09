@@ -198,28 +198,74 @@ class ExperimentRunner:
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
 
         self.print_results(exp_metrics)
-        plt.figure(figsize=(10, 8))
-        sns.set_theme()
+
+        # True
+        tox_true = self.dose_scenario.toxicity_probs
+        eff_true = self.dose_scenario.efficacy_probs
+
+        # Empirical
+        tox_means = exp_metrics.p_hat[0, :, :].T
+        eff_means = exp_metrics.q_hat[0, :, :].T
+       
+        # Model
+        final_params = exp_metrics.a_hat_fin[0, :]
+        model_toxicities = np.array([TanhModel.get_toxicity(self.dose_scenario.dose_labels, param) for param in final_params])
+
+        def plot_trial(ax, rep_means, true_y, model_means=None):
+            test_x = self.dose_scenario.dose_labels
+
+            # True
+            ax.plot(test_x, true_y, 'g-', marker='o', label='True')
+
+            # Empirical
+            mean = np.mean(rep_means, axis=0)
+            ci = 1.96 * np.std(rep_means, axis=0) / np.sqrt(rep_means.shape[0])
+
+            ax.plot(test_x, mean, 'b-', marker='o', label='Empirical')
+            ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
+
+            # Model
+            if model_means is not None:
+                mean = np.mean(model_means, axis=0)
+                ci = 1.96 * np.std(model_means, axis=0) / np.sqrt(model_means.shape[0])
+                ax.plot(test_x, mean, 'r-', marker='o', label='Model')
+                ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
+
+            ax.legend()
+
+        # Plot toxicity and efficacy curves
+        sns.set()
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+        axs[0].set_title("Toxicity")
+        axs[1].set_title("Efficacy")
+
+        plot_trial(axs[0], tox_means, tox_true, model_toxicities)
+        plot_trial(axs[1], eff_means, eff_true)
+        plt.show()
+        
+        # plt.figure(figsize=(10, 8))
+        # sns.set_theme()
 
         # Subgroup plots
         # Dose toxicity for contextual model
-        plt.subplot(331)
-        subgroup_index = 0
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                           exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.subplot(331)
+        # subgroup_index = 0
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                    exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.show()
         
-        plt.subplot(332)
-        subgroup_index = 1
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                          exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.subplot(332)
+        # subgroup_index = 1
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                   exp_metrics.p_hat[subgroup_index, :, :])
         
-        plt.subplot(333)
-        subgroup_index = 2
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                           exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.subplot(333)
+        # subgroup_index = 2
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.dose_scenario.toxicity_probs[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                    exp_metrics.p_hat[subgroup_index, :, :])
         
 
-        self.make_plots(dose_labels, exp_metrics)
+        # self.make_plots(dose_labels, exp_metrics)
 
 
 def main():
@@ -239,7 +285,7 @@ def main2():
     num_patients = 50
     learning_rate = 0.01
     patient_scenario = TrialPopulationScenarios.homogenous_population()
-    dose_scenario = DoseFindingScenarios.oquigley_model_example()
+    dose_scenario = DoseFindingScenarios.taka_synthetic_3()
             
     runner = ExperimentRunner(reps, patient_scenario, dose_scenario, num_patients, learning_rate)
 
