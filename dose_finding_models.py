@@ -593,6 +593,7 @@ class OGTanhModel(TanhModel):
                     # Calculate alpha
                     self.alpha[s] = alpha_func(dose_labels[s, :], self.num_doses, self.delta[s], np.sum(self.n_choose[s, :])) 
                     # Use toxicity model estimates
+                    
                     self.available_doses[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat[s, timestep]) <= dose_scenario.toxicity_threshold
                     # Use empirical toxicity estimates
                     #self.available_doses[s, :] = self.empirical_toxicity_estimate[s, :] <= tox_thre

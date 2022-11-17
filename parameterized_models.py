@@ -13,16 +13,18 @@ class ParameterizedModel:
         raise NotImplementedError
 
 class OQuiqleyModel(ParameterizedModel):
-    def __init__(self, a):
+    def __init__(self, a, shift_param=0, resize_param=1):
         super().__init__()
         self.a = a
+        self.shift_param = shift_param
+        self.resize_param = resize_param
 
     def get_toxicity(self, dose_label):
-        return ((np.tanh(dose_label) + 1.) / 2.) ** self.a
+        return self.resize_param * (((np.tanh(dose_label - self.shift_param) + 1.) / 2.) ** self.a)
 
     def initialize_dose_label(self, dose_skeleton):
-        x = (dose_skeleton ** (1. / self.a) * 2. - 1.)
-        return 1./2. * np.log((1. + x)/(1. - x))
+        x = ((2. / self.resize_param) * (dose_skeleton ** (1. / self.a)) - 1.)
+        return (1./2. * np.log((1. + x)/(1. - x)) + self.shift_param)
 
 
 class SigmoidalModel(ParameterizedModel):
@@ -30,11 +32,11 @@ class SigmoidalModel(ParameterizedModel):
         super().__init__()
         self.a = a
 
-    def get_toxicity(self):
-        pass
+    def get_toxicity(self, dose_label):
+        return 1. / (1. + np.exp(-dose_label))
 
     def initialize_dose_label(self, dose_skeleton):
-        pass
+        return np.log(dose_skeleton / (1. - dose_skeleton))
 
 class PowerModel(ParameterizedModel):
     def __init__(self, a):

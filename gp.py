@@ -14,6 +14,7 @@ class ClassificationGPModel(gpytorch.models.ApproximateGP):
         variational_distribution = gpytorch.variational.CholeskyVariationalDistribution(inducing_points.size(0))
         variational_strategy = gpytorch.variational.VariationalStrategy(self, inducing_points, variational_distribution, learn_inducing_locations=True)
         super(ClassificationGPModel, self).__init__(variational_strategy)
+        # TODO: change to linear mean?
         self.mean_module = gpytorch.means.ConstantMean()
         self.covar_module = gpytorch.kernels.ScaleKernel(gpytorch.kernels.RBFKernel())
     

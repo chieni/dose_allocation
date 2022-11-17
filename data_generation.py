@@ -74,7 +74,7 @@ class DoseFindingScenarios:
     def oquigley_model_example():
         toxicity_probs = np.array([0.15, 0.2, 0.3, 0.55, 0.8])
         efficacy_probs = np.array([0.15, 0.3, 0.45, 0.5, 0.55])
-        model = OQuiqleyModel(0.5)
+        model = OQuiqleyModel(1)
         dose_labels = model.initialize_dose_label(toxicity_probs.flatten())
         optimal_doses = np.array([2])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
@@ -515,4 +515,25 @@ class TrialPopulationScenarios:
     def lee_trial_population():
         arr_rate = [5, 4, 3]
         return TrialPopulation(3, arr_rate)
+
+init_toxicity_probs = np.arange(0.05, 1.0, 0.05)
+a = 0.5
+shift_param = -np.arctanh(2 * np.exp(np.log(0.05) / a) - 1)
+model = OQuiqleyModel(a, shift_param)
+init_dose_labels = model.initialize_dose_label(init_toxicity_probs)
+
+model2 = OQuiqleyModel(a, shift_param, resize_param=5)
+#init_dose_labels2 = model2.initialize_dose_label(init_toxicity_probs)
+
+# Find the largest range of dose labels and then recalculate toxicities to fit this range
+# max_dose_label = np.max((init_dose_labels, init_dose_labels2))
+# dose_labels = np.arange(0.05, max_dose_label, 0.05)
+
+sns.set()
+plt.plot(init_dose_labels, model.get_toxicity(init_dose_labels), label='Toxicity 1')
+plt.plot(init_dose_labels, model2.get_toxicity(init_dose_labels), label='Toxicity 2')
+
+plt.ylim(0, 1.0)
+plt.legend()
+plt.show()
 

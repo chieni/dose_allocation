@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import scipy.stats
 import torch
 import gpytorch
 import tqdm
@@ -12,9 +13,11 @@ from gp import ClassificationRunner, MultitaskGPModel, MultitaskClassificationRu
 
 
 class PosteriorDist:
-    def __init__(self, x_axis, mean, lower=None, upper=None):
+    def __init__(self, x_axis, samples, mean, variance, lower=None, upper=None):
         self.x_axis = x_axis
+        self.samples = samples
         self.mean = mean
+        self.variance = variance
         self.lower = lower
         self.upper = upper
 
@@ -95,9 +98,28 @@ class DoseFindingExperiment:
 
         return patients, selected_arms, train_x, train_y, test_x
 
-    def select_dose(self, tox_mean, eff_mean):
-        safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
-        selected_dose = np.argmax(eff_mean.numpy() * safe_dose_set)
+    def select_dose(self, tox_dist, eff_dist, beta_param=1.):
+        # Basic method
+        # tox_mean = tox_dist.mean
+        # eff_mean = eff_dist.mean
+        # safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
+        # selected_dose = np.argmax(eff_mean.numpy() * safe_dose_set)
+
+        ## UCB method
+        # Select safe doses using UCB of toxicity distribution
+        safe_dose_set = tox_dist.upper.numpy() <= self.dose_scenario.toxicity_threshold
+
+        # Select optimal dose using EI of efficacy distribution
+        eff_mean = eff_dist.mean
+        eff_var = eff_dist.variance
+        eff_std = np.sqrt(eff_var)
+        # eff_mean += self.jitter
+        y_minimum = eff_dist.samples.probs.min()
+        normalized_y =  (y_minimum - eff_mean) / eff_std
+        pdf = scipy.stats.norm.pdf(normalized_y)
+        cdf = scipy.stats.norm.cdf(normalized_y)
+        improvement = eff_std * (normalized_y * cdf + pdf)
+        selected_dose = np.argmax(improvement * safe_dose_set)
         return selected_dose
 
     def select_final_dose(self, tox_mean, eff_mean):
@@ -134,13 +156,14 @@ class DoseFindingExperiment:
     def _plot_gp_results_helper(self, ax, train_x, train_y, posterior_dist, true_x, true_y):
         sns.set()
         ax.scatter(train_x, train_y, s=40, c='k', alpha=0.1, label='Training Data')
-        ax.plot(posterior_dist.x_axis, posterior_dist.mean, 'b-', marker='o',label='GP Predicted')
+        ax.plot(posterior_dist.x_axis.numpy(), posterior_dist.mean, 'b-',
+                markevery=np.isin(posterior_dist.x_axis.numpy(), true_x), marker='o',label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')
         if posterior_dist.lower is not None and posterior_dist.upper is not None:
             ax.fill_between(posterior_dist.x_axis, posterior_dist.lower, posterior_dist.upper, alpha=0.5)
         ax.legend()
 
-    def plot_trial_gp_results(self, tox_means, eff_means, test_x):
+    def plot_trial_gp_results(self, tox_means, eff_means, test_x, dose_labels):
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
         axs[0].set_title("Toxicity")
         axs[1].set_title("Efficacy")
@@ -170,31 +193,32 @@ class DoseFindingExperiment:
         eff_runner.train(train_x, eff_train_y, num_epochs=num_epochs)
         eff_posterior_latent_dist, eff_posterior_observed_dist = eff_runner.predict(test_x)
         eff_dist = self.get_bernoulli_confidence_region(test_x, eff_posterior_latent_dist, eff_runner.likelihood, num_confidence_samples)
-        return tox_dist, eff_dist
+        return tox_runner, eff_runner, tox_dist, eff_dist
 
     def run_multitask_gp(self, num_epochs, num_latents, num_tasks, num_inducing_pts, train_x, train_y, test_x, num_confidence_samples):
         runner = MultitaskClassificationRunner(num_latents, num_tasks, num_inducing_pts)
         runner.train(train_x, train_y, num_epochs)
         posterior_latent_dist, posterior_observed_dist = runner.predict(test_x)
         post_dist = self.get_bernoulli_confidence_region(test_x, posterior_latent_dist, runner.likelihood, num_confidence_samples)
-        tox_dist = PosteriorDist(post_dist.x_axis, post_dist.mean[:, 0], post_dist.lower[:, 0], post_dist.upper[:, 0])
-        eff_dist = PosteriorDist(post_dist.x_axis, post_dist.mean[:, 1], post_dist.lower[:, 1], post_dist.upper[:, 1])
-        return tox_dist, eff_dist
+        tox_dist = PosteriorDist(post_dist.x_axis, post_dist.samples[:, 0], post_dist.mean[:, 0], post_dist.variance[:, 0], post_dist.lower[:, 0], post_dist.upper[:, 0])
+        eff_dist = PosteriorDist(post_dist.x_axis, post_dist.samples[:, 1], post_dist.mean[:, 1], post_dist.variance[:, 1], post_dist.lower[:, 1], post_dist.upper[:, 1])
+        return runner, tox_dist, eff_dist
 
     def get_bernoulli_confidence_region(self, test_x, posterior_latent_dist, likelihood_model, num_samples):
         samples = posterior_latent_dist.sample_n(num_samples)
         likelihood_samples = likelihood_model(samples)
         lower = torch.quantile(likelihood_samples.mean, 0.025, axis=0)
         upper = torch.quantile(likelihood_samples.mean, 1 - 0.025, axis=0)
-        mean = likelihood_samples.mean.mean(axis=0)
-        return PosteriorDist(test_x, mean, lower, upper)
+        mean = likelihood_samples.probs.mean(axis=0)
+        variance = likelihood_samples.probs.var(axis=0)
+        return PosteriorDist(test_x, likelihood_samples, mean, variance, lower, upper)
 
 
 def dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, show_plot=True):
     inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
     
     patients, selected_arms, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
-    tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
+    tox_runner, eff_runner, tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
                                                      train_y[:, 0], train_y[:, 1], test_x,
                                                      num_confidence_samples)
 
@@ -210,7 +234,7 @@ def multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
                            num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
                            show_plot=True):
     _, selected_arms, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
-    tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
+    runner, tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                      train_x, train_y, test_x, num_confidence_samples)
 
     final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
@@ -244,11 +268,11 @@ def online_dose_example(experiment, dose_scenario, num_samples, num_epochs,
         tox_train_y = torch.tensor(toxicity_responses, dtype=torch.float32)
         eff_train_y = torch.tensor(efficacy_responses, dtype=torch.float32)
 
-        tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
-                                                         tox_train_y, eff_train_y, test_x,
-                                                         num_confidence_samples)
+        tox_runner, eff_runner, tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
+                                                                                 tox_train_y, eff_train_y, test_x,
+                                                                                  num_confidence_samples)
 
-        selected_dose = experiment.select_dose(tox_dist.mean, eff_dist.mean)
+        selected_dose = experiment.select_dose(tox_dist, eff_dist)
         if selected_dose > max_dose + 1:
             selected_dose = max_dose + 1
             max_dose = selected_dose
@@ -264,19 +288,32 @@ def online_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     train_x = torch.tensor(selected_dose_values, dtype=torch.float32)
     tox_train_y = torch.tensor(toxicity_responses, dtype=torch.float32)
     eff_train_y = torch.tensor(efficacy_responses, dtype=torch.float32)
-
-    tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
-                                                     tox_train_y, eff_train_y, test_x,
-                                                     num_confidence_samples)
+    
+    tox_runner, eff_runner, tox_dist, eff_dist = experiment.run_separate_gps(inducing_points, num_epochs, train_x,
+                                                                             tox_train_y, eff_train_y, test_x,
+                                                                             num_confidence_samples)
 
     final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
-
     experiment_metrics = DoseExperimentMetrics(num_samples, np.sum(toxicity_responses), np.sum(efficacy_responses),
                                                selected_doses, dose_scenario.optimal_doses, final_dose_error)
     if show_plot:
         experiment_metrics.print_metrics()
+        plot_test_x = torch.cat((torch.arange(torch.min(test_x), torch.max(test_x) + 0.1, 0.1), test_x)).unique()
+        plot_test_x.sort()
+        tox_latent_dist, _ = tox_runner.predict(plot_test_x)
+        eff_latent_dist, _ = eff_runner.predict(plot_test_x)
+
+        tox_plot_dist = experiment.get_bernoulli_confidence_region(plot_test_x,
+                                                                  tox_latent_dist,
+                                                                  tox_runner.likelihood,
+                                                                  num_confidence_samples)
+        eff_plot_dist = experiment.get_bernoulli_confidence_region(plot_test_x,
+                                                                   eff_latent_dist,
+                                                                   eff_runner.likelihood,
+                                                                   num_confidence_samples)
+
         experiment.plot_gp_results(train_x.numpy(), tox_train_y.numpy(),
-                                eff_train_y.numpy(), tox_dist, eff_dist)
+                                   eff_train_y.numpy(), tox_plot_dist, eff_plot_dist)
     return experiment_metrics, tox_dist, eff_dist
 
 def online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
@@ -301,10 +338,10 @@ def online_multitask_dose_example(experiment, dose_scenario, num_samples, num_ep
         eff_train_y = torch.tensor(efficacy_responses, dtype=torch.float32)
         train_y = torch.stack([tox_train_y, eff_train_y], -1)
 
-        tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
+        runner, tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                          train_x, train_y, test_x, num_confidence_samples)
         print(f"Tox dist: {tox_dist.mean}")
-        selected_dose = experiment.select_dose(tox_dist.mean, eff_dist.mean)
+        selected_dose = experiment.select_dose(tox_dist, eff_dist)
         if selected_dose > max_dose + 1:
             selected_dose = max_dose + 1
             max_dose = selected_dose
@@ -323,7 +360,7 @@ def online_multitask_dose_example(experiment, dose_scenario, num_samples, num_ep
     eff_train_y = torch.tensor(efficacy_responses, dtype=torch.float32)
     train_y = torch.stack([tox_train_y, eff_train_y], -1)
 
-    tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
+    runner, tox_dist, eff_dist = experiment.run_multitask_gp(num_epochs, num_latents, num_tasks, num_inducing_pts,
                                                      train_x, train_y, test_x, num_confidence_samples)
     print(f"Tox dist: {tox_dist.mean}")
     final_dose_error = experiment.select_final_dose(tox_dist.mean, eff_dist.mean)
@@ -427,10 +464,10 @@ def online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_sa
 
 
 def main():
-    dose_scenario = DoseFindingScenarios.taka_synthetic_3()
+    dose_scenario = DoseFindingScenarios.aziz_synthetic_1()
     patient_scenario = TrialPopulationScenarios.homogenous_population()
     num_samples = 36
-    num_epochs = 500
+    num_epochs = 300
     num_confidence_samples = 10000
 
     num_latents = 3
@@ -445,13 +482,13 @@ def main():
 
 
     cohort_size = 3
-    # online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
+    online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
     # online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, cohort_size, num_latents,
     #                               num_tasks, num_inducing_pts)
     
-    num_reps = 10
-    dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps)
+    num_reps = 100
+    # dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps)
     # multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps)
     # online_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
