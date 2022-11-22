@@ -9,7 +9,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from data_generation import DoseFindingScenarios, TrialPopulationScenarios
-from gp import ClassificationRunner, MultitaskGPModel, MultitaskClassificationRunner, MultitaskBernoulliLikelihood
+from gp import ClassificationRunner, MultitaskGPModel, MultitaskClassificationRunner, MultitaskBernoulliLikelihood, \
+               MultitaskSubgroupClassificationRunner
 
 
 class PosteriorDist:
@@ -95,6 +96,7 @@ class DoseFindingExperiment:
         tox_y = torch.tensor(toxicity_data.astype(np.float32))
         eff_y = torch.tensor(efficacy_data.astype(np.float32))
         train_y = torch.stack([tox_y, eff_y], -1)
+        patients = torch.tensor(patients, dtype=torch.long)
 
         return patients, selected_arms, train_x, train_y, test_x
 
@@ -203,6 +205,32 @@ class DoseFindingExperiment:
         tox_dist = PosteriorDist(post_dist.x_axis, post_dist.samples[:, 0], post_dist.mean[:, 0], post_dist.variance[:, 0], post_dist.lower[:, 0], post_dist.upper[:, 0])
         eff_dist = PosteriorDist(post_dist.x_axis, post_dist.samples[:, 1], post_dist.mean[:, 1], post_dist.variance[:, 1], post_dist.lower[:, 1], post_dist.upper[:, 1])
         return runner, tox_dist, eff_dist
+    
+    def run_separate_subgroup_gps(self, inducing_points, num_tasks, num_epochs, train_x,
+                                  tox_train_y, eff_train_y, test_x, patients, num_subgroups,
+                                  num_confidence_samples):
+        '''
+        Separate for each subgroup and each task (tox/eff).
+        '''
+        patients = torch.unsqueeze(patients, dim=1)
+        tox_runner = MultitaskSubgroupClassificationRunner(inducing_points, num_tasks)
+        tox_runner.train(train_x, tox_train_y, patients, num_epochs)
+        tox_dists = []
+        for subgroup in range(num_subgroups):
+            task_indices = torch.full((test_x.shape[0],1), dtype=torch.long, fill_value=subgroup)
+            posterior_latent_dist, posterior_observed_dist = tox_runner.predict(test_x, task_indices)
+            post_dist = self.get_bernoulli_confidence_region(test_x, posterior_latent_dist, tox_runner.likelihood, num_confidence_samples)
+            tox_dists.append(post_dist)
+
+        eff_runner = MultitaskSubgroupClassificationRunner(inducing_points, num_tasks)
+        eff_runner.train(train_x, eff_train_y, patients, num_epochs)
+        eff_dists = []
+        for subgroup in range(num_subgroups):
+            task_indices = torch.full((test_x.shape[0],1), dtype=torch.long, fill_value=subgroup)
+            posterior_latent_dist, posterior_observed_dist = eff_runner.predict(test_x, task_indices)
+            post_dist = self.get_bernoulli_confidence_region(test_x, posterior_latent_dist, eff_runner.likelihood, num_confidence_samples)
+            eff_dists.append(post_dist)
+        return tox_runner, eff_runner, tox_dists, eff_dists
 
     def get_bernoulli_confidence_region(self, test_x, posterior_latent_dist, likelihood_model, num_samples):
         samples = posterior_latent_dist.sample_n(num_samples)
@@ -213,6 +241,18 @@ class DoseFindingExperiment:
         variance = likelihood_samples.probs.var(axis=0)
         return PosteriorDist(test_x, likelihood_samples, mean, variance, lower, upper)
 
+def subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples,
+                           num_tasks, show_plot=True):
+    inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
+    patients, selected_arms, train_x, train_y, test_x = experiment.get_offline_data(num_samples)
+    tox_train_y = train_y[:, 0]
+    eff_train_y = train_y[:, 1]
+    num_subgroups = dose_scenario.num_subgroups
+
+    tox_runner, eff_runner, tox_dists, eff_dists = experiment.run_separate_subgroup_gps(inducing_points, num_tasks, num_epochs, train_x,
+                                    tox_train_y, eff_train_y, test_x, patients, num_subgroups,
+                                    num_confidence_samples)
+    import pdb; pdb.set_trace()
 
 def dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, show_plot=True):
     inducing_points = torch.tensor(dose_scenario.dose_labels.astype(np.float32))
@@ -464,9 +504,9 @@ def online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_sa
 
 
 def main():
-    dose_scenario = DoseFindingScenarios.aziz_synthetic_1()
-    patient_scenario = TrialPopulationScenarios.homogenous_population()
-    num_samples = 36
+    dose_scenario = DoseFindingScenarios.oquigley_subgroups_example_1()
+    patient_scenario = TrialPopulationScenarios.equal_population(2)
+    num_samples = 30
     num_epochs = 300
     num_confidence_samples = 10000
 
@@ -482,7 +522,7 @@ def main():
 
 
     cohort_size = 3
-    online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
+    # online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
     # online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, cohort_size, num_latents,
     #                               num_tasks, num_inducing_pts)
@@ -496,6 +536,8 @@ def main():
     # online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                                      num_confidence_samples, cohort_size, num_latents,
     #                                      num_tasks, num_inducing_pts, num_reps)
+
+    subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, num_tasks)
 
 
 main()
