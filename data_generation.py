@@ -63,7 +63,10 @@ class DoseFindingScenario:
 
     def plot_subgroup_curves(self):
         sns.set()
-        plotted_dose_labels = np.arange(self.dose_range[0], self.dose_range[1], 0.05, dtype=np.float32)
+        plotted_dose_labels = np.concatenate([np.arange(self.dose_range[0], self.dose_range[1], 0.05, dtype=np.float32),
+                                             self.dose_labels])
+        plotted_dose_labels = np.unique(plotted_dose_labels)
+        np.sort(plotted_dose_labels)
         for idx, model in enumerate(self.tox_models):
             plt.plot(plotted_dose_labels, model.get_toxicity(plotted_dose_labels),
                      markevery=np.isin(plotted_dose_labels, self.dose_labels),
@@ -94,12 +97,16 @@ class DoseFindingScenario:
     def sample_toxicity_event(self, arm_idx, subgroup_idx=0):
         return np.random.rand() <= self.get_toxicity_prob(arm_idx, subgroup_idx)
     
-    def generate_toxicity_data(self, selected_arms):
-        events = np.array([self.sample_toxicity_event(arm_idx) for arm_idx in selected_arms], dtype=int)
+    def generate_toxicity_data(self, selected_arms, subgroup_indices):
+        events = np.array([self.sample_toxicity_event(arm_idx, subgroup_idx) \
+                           for arm_idx, subgroup_idx in zip(selected_arms, subgroup_indices)],
+                           dtype=int)
         return events
 
-    def generate_efficacy_data(self, selected_arms):
-        events = np.array([self.sample_efficacy_event(arm_idx) for arm_idx in selected_arms], dtype=int)
+    def generate_efficacy_data(self, selected_arms, subgroup_indices):
+        events = np.array([self.sample_efficacy_event(arm_idx, subgroup_idx) \
+                           for arm_idx, subgroup_idx in zip(selected_arms, subgroup_indices)],
+                           dtype=int)
         return events
 
 
@@ -120,15 +127,15 @@ class DoseFindingScenarios:
     @staticmethod
     def oquigley_subgroups_example_1():
         # Subgroups requiring different doses
-        dose_range = (0.05, 60.)
+        dose_range = (0.05, 20.)
 
-        tox_model = OQuiqleyModel(0.5, resize_param=1/15, vertical_resize_param=1, auto_shift=True)
-        tox_model2 = OQuiqleyModel(0.5, resize_param=1/10, vertical_resize_param=1, auto_shift=True)
+        tox_model = OQuiqleyModel(0.8, resize_param=1/5, vertical_resize_param=1, auto_shift=True)
+        tox_model2 = OQuiqleyModel(1.0, resize_param=1/9, vertical_resize_param=1, auto_shift=True)
 
-        eff_model = OQuiqleyModel(0.8, resize_param=1/15, vertical_resize_param=0.75, auto_shift=True)
-        eff_model2 = OQuiqleyModel(0.8, resize_param=1/10, vertical_resize_param=0.75, auto_shift=True)
+        eff_model = OQuiqleyModel(0.8, resize_param=1/4, vertical_resize_param=0.9, auto_shift=True)
+        eff_model2 = OQuiqleyModel(0.8, resize_param=1/3, vertical_resize_param=0.9, auto_shift=True)
 
-        dose_labels = np.array([2.5, 5., 10., 20., 35.], dtype=np.float32)
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
         toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels)),
                                    np.array(tox_model2.get_toxicity(dose_labels))))
         # Need efficacy models - plateau and monotonic
@@ -138,7 +145,7 @@ class DoseFindingScenarios:
 
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
-                                   optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2,
+                                   optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.15,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
                                    dose_range=dose_range)
     @staticmethod
@@ -158,7 +165,7 @@ class DoseFindingScenarios:
 
         efficacy_probs = np.stack((np.array(eff_model.get_toxicity(dose_labels)),
                                          np.array(eff_model2.get_toxicity(dose_labels))))
-        optimal_doses = np.array([1, 3])
+        optimal_doses = np.array([3, 3])
 
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
@@ -228,6 +235,7 @@ class DoseFindingScenarios:
         dose_skeleton = np.mean(toxicity_probs, axis=0)
         model = OQuiqleyModel(a0)
         dose_skeleton_labels = model.initialize_dose_label(dose_skeleton)
+        dose_skeleton_labels = dose_skeleton_labels.astype(np.float32)
         optimal_doses = np.array([6, 3, 3])
         return DoseFindingScenario(dose_skeleton_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
@@ -609,5 +617,6 @@ class TrialPopulationScenarios:
         return TrialPopulation(num_subgroups, arr_rate)
 
 
-# scenario = DoseFindingScenarios.oquigley_subgroups_example_2()
+# scenario = DoseFindingScenarios.oquigley_subgroups_example_1()
+# print(f"True toxicities {[scenario.get_toxicity_prob(label, 1) for label in range(scenario.num_doses)]}")
 # scenario.plot_subgroup_curves()
