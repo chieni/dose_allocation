@@ -1099,16 +1099,16 @@ def main():
     beta_param = 1.0
     # subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
-    online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
-                                  num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, "results/four_example")
+    # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
+    #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+    #                               cohort_size, learning_rate, beta_param, "results/four_example")
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
     #                               learning_rate, "results/exp5")
     
-    # online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
-    #                                     num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                                     cohort_size, learning_rate, num_reps, beta_param, "results/exp7")
+    online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp7")
 
 
 main()
