@@ -20,8 +20,8 @@ class ExperimentRunner:
         self.arr_rate = arr_rate
         self.tox_thre = tox_thre
         self.eff_thre = eff_thre
-        self.p_true = p_true
-        self.q_true = q_true
+        self.p_true = p_true # tox
+        self.q_true = q_true # eff
         self.opt = opt
         self.learning_rate = learning_rate
 
@@ -118,7 +118,7 @@ class ExperimentRunner:
         frame['all'] = mean_frame
         frame = frame.reset_index()
         frame = pd.melt(frame, id_vars=['index'], var_name='group', value_name=value_name)
-        sns.pointplot(x='group', y=value_name, data=frame, join=False, kind='point')
+        sns.pointplot(x='group', y=value_name, data=frame, join=False)
         plt.ylim(0, 1.0)
         plt.xlabel('Subgroup')
         plt.ylabel(value_name)
@@ -150,7 +150,7 @@ class ExperimentRunner:
 
         final_frame = pd.concat([frame, tox_frame])
 
-        sns.pointplot(x='group', y='Metric per Person', hue='metric', data=final_frame, join=False, kind='point')
+        sns.pointplot(x='group', y='Metric per Person', hue='metric', data=final_frame, join=False)
         plt.xlabel('Subgroup')
         plt.ylabel('Metric per Person')
 
@@ -216,6 +216,7 @@ class ExperimentRunner:
             print(f"Trial: {i}")
             # patients arrival generation
             pats = self.gen_patients()
+
             for tau in range(self.num_patients):
                 p_rec[pats[tau], tau:, i] += 1
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
@@ -230,30 +231,60 @@ class ExperimentRunner:
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
-
         self.print_results(exp_metrics)
-        plt.figure(figsize=(10, 8))
-        sns.set_theme()
 
-        # Subgroup plots
-        # Dose toxicity for contextual model
-        plt.subplot(331)
-        subgroup_index = 0
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                           exp_metrics.p_hat[subgroup_index, :, :])
+        def _plot_subgroup_trials(ax, rep_means, test_x, true_x, true_y):
+            sns.set()
+            mean = np.mean(rep_means, axis=1)
+            ci = 1.96 * np.std(rep_means, axis=1) / np.sqrt(rep_means.shape[1])
+            ax.plot(test_x, mean, 'b-', markevery=np.isin(test_x, true_x), marker='o', label='GP Predicted')
+            ax.plot(true_x, true_y, 'g-', marker='o', label='True')
+            ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
+            ax.set_ylim([0, 1.1])
+            ax.legend()
+
+      
+        fig, axs = plt.subplots(self.num_subgroups, 2, figsize=(8, 8))
+        for subgroup_idx in range(self.num_subgroups):
+            axs[subgroup_idx, 0].set_title(f"Toxicity - Subgroup {subgroup_idx}")
+            axs[subgroup_idx, 1].set_title(f"Efficacy - Subgroup {subgroup_idx}")
+            # exp_metrics.p_hat[subgroup_idx, :, :]
+            predicted_toxicities = np.array([TanhModel.get_toxicity(dose_labels[subgroup_idx], exp_metrics.a_hat_fin[subgroup_idx, i]) for i in range(self.reps)])
+            _plot_subgroup_trials(axs[subgroup_idx, 0], predicted_toxicities.T, dose_labels[subgroup_idx],
+                                  dose_labels[subgroup_idx], self.p_true[subgroup_idx])
+
+            _plot_subgroup_trials(axs[subgroup_idx, 1], exp_metrics.q_hat[subgroup_idx, :, :], dose_labels[subgroup_idx],
+                                  dose_labels[subgroup_idx], self.q_true[subgroup_idx])
+
+        fig.tight_layout()
+        plt.show()
+
+
+        # plt.figure(figsize=(10, 8))
+        # sns.set_theme()
+
+        # # Subgroup plots
+        # # Dose toxicity for contextual model
+        # plt.subplot(331)
+        # subgroup_index = 0
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                    exp_metrics.p_hat[subgroup_index, :, :])
         
-        plt.subplot(332)
-        subgroup_index = 1
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                          exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.subplot(332)
+        # subgroup_index = 1
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                   exp_metrics.p_hat[subgroup_index, :, :])
         
-        plt.subplot(333)
-        subgroup_index = 2
-        TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
-                                           exp_metrics.p_hat[subgroup_index, :, :])
+        # plt.subplot(333)
+        # subgroup_index = 2
+        # TanhModel.plot_dose_toxicity_curve(dose_labels[subgroup_index], self.p_true[subgroup_index], exp_metrics.a_hat_fin[subgroup_index, :],
+        #                                    exp_metrics.p_hat[subgroup_index, :, :])
         
 
-        self.make_plots(dose_labels, exp_metrics)
+        # self.make_plots(dose_labels, exp_metrics)
+
+
+
 
 
 def main():
@@ -290,10 +321,10 @@ def main():
 
 def main2():
     reps = 100 # num of simulated trials
-    num_patients = 30
+    num_patients = 50
     learning_rate = 0.01
 
-    scenario = DoseFindingScenarios.oquigley_subgroups_example_1()
+    scenario = DoseFindingScenarios.subgroups_example_1()
     num_doses = scenario.num_doses
     num_subgroups = scenario.num_subgroups
     tox_thre = scenario.toxicity_threshold
@@ -304,7 +335,7 @@ def main2():
 
     patient_scenario = TrialPopulationScenarios.equal_population(num_subgroups)
     arr_rate = patient_scenario.arrival_rate
-            
+
     runner = ExperimentRunner(reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate)
 
     # a0 = 0.1

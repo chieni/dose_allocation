@@ -48,8 +48,8 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
         super().__init__(variational_strategy)
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([num_latents]))
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])),
-            batch_shape=torch.Size([num_latents])
+            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])) + gpytorch.kernels.LinearKernel(),
+            batch_shape=torch.Size([num_latents]) 
         )
 
     def forward(self, x):
@@ -150,8 +150,20 @@ class MultitaskSubgroupClassificationRunner:
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate=0.1):
         self.model.train()
         self.likelihood.train()
-        optimizer = torch.optim.Adam([{'params': self.model.parameters()},
+
+        init_lengthscale = 2
+        init_variance = 1
+        self.model.covar_module.base_kernel.kernels[0].lengthscale = init_lengthscale
+        self.model.covar_module.base_kernel.kernels[1].variance = init_variance
+        all_params = set(self.model.parameters())
+        model_params = list(all_params - {self.model.covar_module.base_kernel})
+
+        # for name, param in self.model.named_parameters():
+        #     print(name, param.data)
+        
+        optimizer = torch.optim.Adam([{'params': model_params},
                                       {'params': self.likelihood.parameters()},], lr=learning_rate)
+
         mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=train_y.size(0), beta=1.)
         epochs_iter = tqdm.tqdm(range(num_epochs), desc="Epoch")
         for i in epochs_iter:

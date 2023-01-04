@@ -25,12 +25,18 @@ class OQuiqleyModel(ParameterizedModel):
         if auto_shift:
             self.shift_param = self.get_shift_param()
 
-    def get_toxicity(self, dose_label):
+    def get_toxicity(self, dose_label, add_noise=False):
         a = self.a
         c = self.vertical_resize_param
         m = self.resize_param
         b = self.shift_param
         x = dose_label
+
+        if add_noise:
+            noise = np.random.normal(0, 0.15)
+            val = (c * (((np.tanh(m * x + b) + 1.) / 2.) ** a)) + noise
+            val[val < 0.05] = 0.05
+            val[val > 1.0] = 0.95
 
         return c * (((np.tanh(m * x + b) + 1.) / 2.) ** a)
         #return self.vertical_resize_param * (((np.tanh(self.resize_param * dose_label - self.shift_param) + 1.) / 2.) ** self.a)

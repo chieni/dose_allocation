@@ -160,7 +160,8 @@ class DoseFindingExperiment:
         mask = np.isin(test_x, dose_labels)
         # Select safe doses using UCB of toxicity distribution
         # safe_dose_set = tox_dist.upper.numpy()[mask] <= self.dose_scenario.toxicity_threshold
-        safe_dose_set = tox_dist.mean.numpy()[mask] + (beta_param * tox_dist.upper_width.numpy()[mask]) <= self.dose_scenario.toxicity_threshold
+        ucb = tox_dist.mean.numpy()[mask] + (beta_param * tox_dist.upper_width.numpy()[mask]) 
+        safe_dose_set = ucb <= self.dose_scenario.toxicity_threshold
 
         # Select expanders of toxicity distribution?
 
@@ -174,11 +175,60 @@ class DoseFindingExperiment:
         ei = (imp * scipy.stats.norm.cdf(Z)) + (std * scipy.stats.norm.pdf(Z))
         ei[std == 0.0] = 0.0
         ei = ei[mask]
-        selected_dose = np.argmax(ei * safe_dose_set)
+        plot_ei = torch.clone(ei)
+
+        ei[~safe_dose_set] = -np.inf
+        print(safe_dose_set)
+        print(ei)
+        max_ei = ei.max()
+        selected_dose = np.where(ei == max_ei)[0][-1]
 
         print(f"Safe dose set: {safe_dose_set}")
         print(f"Expected improvement: {ei}")
-        return selected_dose
+        print(f"Selected dose: {selected_dose}")
+
+        # If all doses are unsafe, return first dose
+        if safe_dose_set.sum() == 0:
+            return 0, ucb, ei
+        return selected_dose.item(), ucb, plot_ei
+
+    def _plot_dose_selection_helper(self, ax, train_x, train_y, true_x, true_y, test_x, dist,
+                                    acqui_vals, acqui_label, selected_dose, threshold=None):
+        ax.scatter(train_x, train_y, s=40, c='k', alpha=0.1, label='Training Data')
+        
+        ax.plot(test_x, dist.mean, 'b-',
+                markevery=np.isin(test_x, true_x), marker='o',label='GP Predicted')
+        ax.plot(true_x, true_y, 'g-', marker='o', label='True')
+        if dist.lower is not None and dist.upper is not None:
+            ax.fill_between(dist.x_axis, dist.lower, dist.upper, alpha=0.5)
+        ax.plot(true_x, acqui_vals, 'gray', label=acqui_label, marker='o')
+        ax.plot(true_x[selected_dose], acqui_vals[selected_dose], 'r', marker='o')
+        if threshold is not None:
+            ax.plot(test_x, np.repeat(threshold, len(test_x)), 'm', label='Toxicity Threshold')
+        # ax.set_ylim([0, 1.1])
+        ax.legend()
+    
+    def plot_dose_selection(self, train_x, tox_train_y, eff_train_y, patients, num_subgroups,
+                                 test_x, tox_dists, eff_dists, ucb, ei, tox_thre, selected_doses, cohort_outcomes, filepath):
+        sns.set_theme(style="dark")
+        fig, axs = plt.subplots(num_subgroups, 2, figsize=(8, 8))
+        for subgroup_idx in range(num_subgroups):
+            axs[subgroup_idx, 0].set_title(f"Toxicity - Subgroup {subgroup_idx}")
+            axs[subgroup_idx, 1].set_title(f"Efficacy - Subgroup {subgroup_idx}")
+            group_train_x = train_x[patients == subgroup_idx]
+            group_tox_train_y = tox_train_y[patients == subgroup_idx]
+            group_eff_train_y = eff_train_y[patients == subgroup_idx]
+
+            self._plot_dose_selection_helper(axs[subgroup_idx, 0], group_train_x, group_tox_train_y,
+                                                  self.dose_scenario.dose_labels, self.dose_scenario.toxicity_probs[subgroup_idx, :],
+                                                  test_x, tox_dists[subgroup_idx], ucb[subgroup_idx, :], 'Confidence Bound', selected_doses[subgroup_idx], tox_thre)
+            self._plot_dose_selection_helper(axs[subgroup_idx, 1], group_train_x, group_eff_train_y,
+                                                  self.dose_scenario.dose_labels, self.dose_scenario.efficacy_probs[subgroup_idx, :],
+                                                  test_x, eff_dists[subgroup_idx], ei[subgroup_idx, :], 'Expected Improvement', selected_doses[subgroup_idx])
+        plt.figtext(0.5, 0.01, f"Subgroup, dose, tox, eff: {cohort_outcomes}", wrap=True, horizontalalignment='center', fontsize=12)
+        plt.tight_layout()
+        plt.savefig(f"{filepath}plot.png", dpi=300)
+
     
     def select_dose_empirically(self, tox_estimate, eff_estimate, N_choose, beta_param=1.):
         tox_ucb = get_ucb(tox_estimate, beta_param, N_choose, N_choose.sum())
@@ -666,6 +716,8 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
                                   cohort_size, learning_rate, beta_param, filepath):
     patients = patient_scenario.generate_samples(num_samples)
     num_subgroups = dose_scenario.num_subgroups
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
 
     timestep = 0
     max_dose = 0
@@ -715,93 +767,40 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
         cohort_patients = patients[timestep: timestep + cohort_size]
         print(f"Cohort patients: {cohort_patients}")
 
+        # Calculate dose to select for each subgroup
+        timestep_selected_doses = np.ones(num_subgroups, dtype=np.int32) * dose_scenario.num_doses
+        timestep_ucbs = np.empty((num_subgroups, dose_scenario.num_doses))
+        timestep_eis = np.empty((num_subgroups, dose_scenario.num_doses))
         for subgroup_idx in range(num_subgroups):
             print(f"Tox dist {subgroup_idx}: {tox_dists[subgroup_idx].mean[mask]}")
             print(f"Eff dist {subgroup_idx}: {eff_dists[subgroup_idx].mean[mask]}")
-
-        seen_doses = np.array(selected_doses)
-        # Select dose for each patient in next cohort based on subgroup
-        cohort_doses = set()
+            selected_dose, ucb, ei = experiment.select_dose(dose_labels, test_x, tox_dists[subgroup_idx],
+                                                            eff_dists[subgroup_idx], beta_param=beta_param)
+            # Only increase one dose at a time max
+            if selected_dose > max_dose + 1:
+                selected_dose = max_dose + 1
+            
+            timestep_selected_doses[subgroup_idx] = selected_dose
+            timestep_ucbs[subgroup_idx, :] = ucb
+            timestep_eis[subgroup_idx, :] = ei
+        
+        # Assign doses to each patient in cohort
         for subgroup_idx in cohort_patients:
-            # subgroup_tox_mean = tox_dists[subgroup_idx].mean.numpy()[mask] 
-            # subgroup_tox_upper = tox_dists[subgroup_idx].upper.numpy()[mask] 
-
-            # safe_dose_set = subgroup_tox_upper <= dose_scenario.toxicity_threshold
-            # lowest_unsafe_dose_idx = np.where(safe_dose_set == False)
-            # print(f"Initial safe dose set: {safe_dose_set}")
-
-            # if lowest_unsafe_dose_idx[0].shape[0] == 0:
-            #     # if all doses are deemed safe, examine safety based on last seen dose
-            #     subgroup_seen_doses = np.array(seen_doses)[patient_indices == subgroup_idx]
-            #     highest_safe_dose_idx = 0
-            #     if subgroup_seen_doses.shape[0] > 0:
-            #         highest_safe_dose_idx = subgroup_seen_doses.max()
-            #     safe_dose_set = experiment.get_safe_dose_set_from_gradients(highest_safe_dose_idx, test_x, subgroup_idx, tox_runner, mask,
-            #                                                                 subgroup_tox_mean)
-
-            # # All doses unsafe, pick lowest dose again
-            # # TODO add hard constraint here to stop trial if this happens too many times
-            # elif lowest_unsafe_dose_idx[0][0] == 0:
-            #     safe_dose_set = np.empty(dose_labels.shape, dtype=np.bool)
-            #     safe_dose_set.fill(False)
-            #     safe_dose_set[0] = True
-    
-            # else:
-            #     # Calculate expected toxicity of next doses based on gradient at highest safe and seen dose
-            #     subgroup_seen_doses = np.array(seen_doses)[patient_indices == subgroup_idx]
-            #     if subgroup_seen_doses.shape[0] > 0:
-            #         highest_safe_dose_idx = min(lowest_unsafe_dose_idx[0][0] - 1, subgroup_seen_doses.max())
-            #     else:
-            #         highest_safe_dose_idx = lowest_unsafe_dose_idx[0][0] - 1
-            #     safe_dose_set = experiment.get_safe_dose_set_from_gradients(highest_safe_dose_idx, test_x, subgroup_idx, tox_runner, mask,
-            #                                                                 subgroup_tox_mean)
-
-            # eff_dist = eff_dists[subgroup_idx]
-            # xi = 0.01
-            # mean = eff_dist.mean
-            # std = np.sqrt(eff_dist.variance)
-            # mean_optimum = eff_dist.samples.mean(axis=0).max()
-            # imp = mean - mean_optimum - xi
-            # Z = imp / std
-            # ei = (imp * scipy.stats.norm.cdf(Z)) + (std * scipy.stats.norm.pdf(Z))
-            # ei[std == 0.0] = 0.0
-            # ei = ei[mask]
-            # selected_dose = np.argmax(ei * safe_dose_set)
-            # print(f"Expected improvement: {ei}")
-            # selected_doses.append(selected_dose.item())
-
-            if timestep < 10:
-                selected_dose = experiment.select_dose_empirically(empirical_toxicity_estimate[subgroup_idx, :],
-                                                                   empirical_efficacy_estimate[subgroup_idx, :],
-                                                                   N_choose[subgroup_idx, :], beta_param)
-            else:
-                selected_dose = experiment.select_dose(dose_labels, test_x, tox_dists[subgroup_idx],
-                                                       eff_dists[subgroup_idx], beta_param=beta_param).item()
-            # if selected_dose > max_dose + 1:
-            #     selected_dose = max_dose + 1
-            #     max_dose = selected_dose
-
-            if selected_dose > max_dose + 2:
-                selected_dose = max_dose + 2
-
-            cohort_doses.add(selected_dose)
+            selected_dose = timestep_selected_doses[subgroup_idx]
             selected_doses.append(selected_dose)
-
-            print(f"Subgroup: {subgroup_idx}, selected dose: {selected_dose}")
-
-            # selected_dose = experiment.select_dose_utility(dose_labels, test_x, tox_dists[subgroup_idx],
-            #                                                eff_dists[subgroup_idx], beta_param=beta_param).item()
-            # if selected_dose > max_dose + 2:
-            #     selected_dose = max_dose + 2
-            #     max_dose = selected_dose
-            # selected_doses.append(selected_dose)
-
-            # print(f"Subgroup: {subgroup_idx}, selected dose: {selected_dose}")
             selected_dose_values.append(dose_scenario.dose_labels[selected_dose])
             toxicity_responses.append(dose_scenario.sample_toxicity_event(selected_dose, subgroup_idx))
-            efficacy_responses.append(dose_scenario.sample_efficacy_event(selected_dose, subgroup_idx))
+            efficacy_responses.append(dose_scenario.sample_efficacy_event(selected_dose, subgroup_idx)) 
+
+        print(f"Timestep selected doses: {timestep_selected_doses}")
+        prev_cohort_outcomes = [patients[timestep-cohort_size:timestep], selected_doses[timestep-cohort_size:timestep],
+                                toxicity_responses[timestep-cohort_size:timestep],
+                                efficacy_responses[timestep-cohort_size:timestep]]
+        experiment.plot_dose_selection(train_x.numpy(), tox_train_y.numpy(), eff_train_y.numpy(), patient_indices, num_subgroups,
+                                        test_x, tox_dists, eff_dists, timestep_ucbs, timestep_eis, dose_scenario.toxicity_threshold,
+                                        timestep_selected_doses, prev_cohort_outcomes, f"{filepath}/timestep{timestep}")
         
-        max_dose = max(cohort_doses)
+        max_dose = max(selected_doses[timestep: timestep + cohort_size])
         # Update empirical estimates
         for t in range(timestep, timestep + cohort_size):
             subgroup_idx = patients[t]
@@ -849,14 +848,57 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
     experiment_metrics = DoseExperimentSubgroupMetrics(num_samples, patients, num_subgroups, tox_train_y.numpy(), eff_train_y.numpy(), 
                                                        selected_doses, dose_scenario.optimal_doses, final_dose_error, utilities)
 
-    if not os.path.exists(filepath):
-        os.makedirs(filepath)
     experiment_metrics.save_metrics(filepath)
     experiment.plot_subgroup_gp_results(train_x.numpy(), tox_train_y.numpy(), eff_train_y.numpy(), patients, num_subgroups,
                                         test_x, tox_dists, eff_dists, filepath)
 
     return experiment_metrics, tox_dists, eff_dists
 
+            # subgroup_tox_mean = tox_dists[subgroup_idx].mean.numpy()[mask] 
+            # subgroup_tox_upper = tox_dists[subgroup_idx].upper.numpy()[mask] 
+
+            # safe_dose_set = subgroup_tox_upper <= dose_scenario.toxicity_threshold
+            # lowest_unsafe_dose_idx = np.where(safe_dose_set == False)
+            # print(f"Initial safe dose set: {safe_dose_set}")
+
+            # if lowest_unsafe_dose_idx[0].shape[0] == 0:
+            #     # if all doses are deemed safe, examine safety based on last seen dose
+            #     subgroup_seen_doses = np.array(seen_doses)[patient_indices == subgroup_idx]
+            #     highest_safe_dose_idx = 0
+            #     if subgroup_seen_doses.shape[0] > 0:
+            #         highest_safe_dose_idx = subgroup_seen_doses.max()
+            #     safe_dose_set = experiment.get_safe_dose_set_from_gradients(highest_safe_dose_idx, test_x, subgroup_idx, tox_runner, mask,
+            #                                                                 subgroup_tox_mean)
+
+            # # All doses unsafe, pick lowest dose again
+            # # TODO add hard constraint here to stop trial if this happens too many times
+            # elif lowest_unsafe_dose_idx[0][0] == 0:
+            #     safe_dose_set = np.empty(dose_labels.shape, dtype=np.bool)
+            #     safe_dose_set.fill(False)
+            #     safe_dose_set[0] = True
+    
+            # else:
+            #     # Calculate expected toxicity of next doses based on gradient at highest safe and seen dose
+            #     subgroup_seen_doses = np.array(seen_doses)[patient_indices == subgroup_idx]
+            #     if subgroup_seen_doses.shape[0] > 0:
+            #         highest_safe_dose_idx = min(lowest_unsafe_dose_idx[0][0] - 1, subgroup_seen_doses.max())
+            #     else:
+            #         highest_safe_dose_idx = lowest_unsafe_dose_idx[0][0] - 1
+            #     safe_dose_set = experiment.get_safe_dose_set_from_gradients(highest_safe_dose_idx, test_x, subgroup_idx, tox_runner, mask,
+            #                                                                 subgroup_tox_mean)
+
+            # eff_dist = eff_dists[subgroup_idx]
+            # xi = 0.01
+            # mean = eff_dist.mean
+            # std = np.sqrt(eff_dist.variance)
+            # mean_optimum = eff_dist.samples.mean(axis=0).max()
+            # imp = mean - mean_optimum - xi
+            # Z = imp / std
+            # ei = (imp * scipy.stats.norm.cdf(Z)) + (std * scipy.stats.norm.pdf(Z))
+            # ei[std == 0.0] = 0.0
+            # ei = ei[mask]
+            # selected_dose = np.argmax(ei * safe_dose_set)
+            # print(f"Expected improvement: {ei}")
 
 ##### Trials Examples #####
 def dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps):
@@ -1059,7 +1101,7 @@ def main():
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
     online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
                                   num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, "results/one_example")
+                                  cohort_size, learning_rate, beta_param, "results/four_example")
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
     #                               learning_rate, "results/exp5")

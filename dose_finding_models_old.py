@@ -58,7 +58,7 @@ class DoseFindingModel:
 
     def update_efficacy_ucb(self, curr_s):
         for k in range(self.num_doses):
-            self.efficacy_ucb[curr_s, k] = get_ucb(self.empirical_efficacy_estimate[curr_s, k], self.c_param, self.n_choose[curr_s, k], np.sum(self.n_choose[curr_s, :]))
+            self.efficacy_ucb[curr_s, k] = (self.empirical_efficacy_estimate[curr_s, k], self.c_param, self.n_choose[curr_s, k], np.sum(self.n_choose[curr_s, :]))
 
     def update_metrics(self, timestep, curr_s, dose_labels, tox_thre, eff_thre, p_true, q_true, opt_ind):
         '''
@@ -137,6 +137,7 @@ class DoseFindingModel:
         self.metrics.typeI = self.metrics.typeI / self.num_doses
         self.metrics.typeII = self.metrics.typeII / self.num_doses
         self.metrics.p_hat = self.empirical_toxicity_estimate
+        self.metrics.q_hat = self.empirical_efficacy_estimate
         self.metrics.pats_count = np.unique(self.patients, return_counts=True)[1]
         self.metrics.dose_err_by_person = self.metrics.rec_err / self.metrics.pats_count
         self.metrics.cum_eff_by_person = self.metrics.cum_eff[:, -1] / self.metrics.pats_count
