@@ -178,9 +178,9 @@ class DoseFindingExperiment:
         plot_ei = torch.clone(ei)
 
         ei[~safe_dose_set] = -np.inf
-        print(safe_dose_set)
-        print(ei)
         max_ei = ei.max()
+        print(f"Max ei: {max_ei}")
+        print(np.where(ei == max_ei))
         selected_dose = np.where(ei == max_ei)[0][-1]
 
         print(f"Safe dose set: {safe_dose_set}")
@@ -292,7 +292,7 @@ class DoseFindingExperiment:
         dose_error = (dose_rec != self.dose_scenario.optimal_doses).astype(np.float32)
         return dose_error
     
-    def select_final_dose_subgroups_utility(self, dose_labels, test_x, tox_dists, eff_dists):
+    def select_final_dose_subgroups_utility(self, dose_labels, test_x, tox_dists, eff_dists, beta_param=1.):
         mask = np.isin(test_x, dose_labels)
         dose_error = np.zeros(self.patient_scenario.num_subgroups)
         dose_rec = np.ones(self.patient_scenario.num_subgroups) * self.dose_scenario.num_doses
@@ -301,10 +301,16 @@ class DoseFindingExperiment:
         for subgroup_idx in range(self.patient_scenario.num_subgroups):
             tox_mean = tox_dists[subgroup_idx].mean[mask]
             eff_mean = eff_dists[subgroup_idx].mean[mask]
-            safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
+            tox_upper_width = tox_dists[subgroup_idx].upper_width[mask]
+
+            # safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
+            ucb = tox_mean.numpy() + (beta_param * tox_upper_width.numpy()) 
+            safe_dose_set = ucb <= self.dose_scenario.toxicity_threshold
             
             utilities = self.calculate_dose_utility(tox_mean.numpy(), eff_mean.numpy())
             utilities[~safe_dose_set] = -np.inf
+
+            print(f"Final utilities: {utilities}")
             best_dose_idx = np.argmax(utilities)
             best_dose_val = eff_mean.numpy()[best_dose_idx]
 
@@ -793,6 +799,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
             efficacy_responses.append(dose_scenario.sample_efficacy_event(selected_dose, subgroup_idx)) 
 
         print(f"Timestep selected doses: {timestep_selected_doses}")
+        print(f"Selected doses: {selected_doses[timestep: timestep+cohort_size]}")
         prev_cohort_outcomes = [patients[timestep-cohort_size:timestep], selected_doses[timestep-cohort_size:timestep],
                                 toxicity_responses[timestep-cohort_size:timestep],
                                 efficacy_responses[timestep-cohort_size:timestep]]
@@ -838,7 +845,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
     # Select final doses (by subgroup)
     # final_dose_error = experiment.select_final_dose_subgroups(dose_labels, test_x, tox_dists, eff_dists)
 
-    final_dose_error = experiment.select_final_dose_subgroups_utility(dose_labels, test_x, tox_dists, eff_dists)
+    final_dose_error = experiment.select_final_dose_subgroups_utility(dose_labels, test_x, tox_dists, eff_dists, beta_param)
 
     # Calculate utilities retrospectively
     utilities = [experiment.calculate_dose_utility(dose_scenario.get_toxicity_prob(arm_idx, group_idx), dose_scenario.get_efficacy_prob(arm_idx, group_idx))\
@@ -1095,20 +1102,20 @@ def main():
     #                                      num_confidence_samples, cohort_size, num_latents,
     #                                      num_tasks, num_inducing_pts, num_reps)
 
-    learning_rate = 0.1
-    beta_param = 1.0
+    learning_rate = 0.01
+    beta_param = 0.5
     # subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
     # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                               cohort_size, learning_rate, beta_param, "results/four_example")
+    #                               cohort_size, learning_rate, beta_param, "results/sixteen_example")
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
     #                               learning_rate, "results/exp5")
     
     online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
                                         num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp7")
+                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp8")
 
 
 main()

@@ -151,12 +151,14 @@ class MultitaskSubgroupClassificationRunner:
         self.model.train()
         self.likelihood.train()
 
-        init_lengthscale = 2
+        init_lengthscale = 1
         init_variance = 1
         self.model.covar_module.base_kernel.kernels[0].lengthscale = init_lengthscale
         self.model.covar_module.base_kernel.kernels[1].variance = init_variance
         all_params = set(self.model.parameters())
-        model_params = list(all_params - {self.model.covar_module.base_kernel})
+        model_params = list(all_params - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale, 
+                                          self.model.covar_module.base_kernel.kernels[1].raw_variance})
+        model_params = self.model.parameters()
 
         # for name, param in self.model.named_parameters():
         #     print(name, param.data)
@@ -177,7 +179,7 @@ class MultitaskSubgroupClassificationRunner:
     def predict(self, test_x, task_indices):
         self.model.eval()
         self.likelihood.eval()
-
+        
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             posterior_latent_dist = self.model(test_x, task_indices=task_indices)
             posterior_observed_dist = self.likelihood(posterior_latent_dist)
