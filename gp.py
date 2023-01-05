@@ -183,9 +183,13 @@ class MultitaskSubgroupClassificationRunner:
             loss.backward()
             optimizer.step()
     
-    def predict(self, test_x, task_indices):
+    def predict(self, test_x, task_indices, use_gpu=True):
         self.model.eval()
         self.likelihood.eval()
+
+        if use_gpu:
+            test_x = test_x.cuda()
+            task_indices = task_indices.cuda()
         
         with torch.no_grad(), gpytorch.settings.fast_pred_var():
             posterior_latent_dist = self.model(test_x, task_indices=task_indices)
