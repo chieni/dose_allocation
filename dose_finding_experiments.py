@@ -194,8 +194,8 @@ class DoseFindingExperiment:
 
     def _plot_dose_selection_helper(self, ax, train_x, train_y, true_x, true_y, test_x, dist,
                                     acqui_vals, acqui_label, selected_dose, threshold=None):
+        test_x = test_x.numpy()
         ax.scatter(train_x, train_y, s=40, c='k', alpha=0.1, label='Training Data')
-        
         ax.plot(test_x, dist.mean, 'b-',
                 markevery=np.isin(test_x, true_x), marker='o',label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')

@@ -147,7 +147,14 @@ class MultitaskSubgroupClassificationRunner:
         self.model = MultitaskGPModel(num_latents, num_tasks, inducing_points)
         self.likelihood = MultitaskBernoulliLikelihood()
 
-    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate=0.1):
+    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate=0.1, use_gpu=True):
+        if use_gpu:
+            self.model = self.model.cuda()
+            self.likelihood = self.likelihood.cuda()
+            train_x = train_x.cuda()
+            train_y = train_y.cuda()
+            task_indices = task_indices.cuda()
+
         self.model.train()
         self.likelihood.train()
 
