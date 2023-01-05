@@ -147,7 +147,7 @@ class MultitaskSubgroupClassificationRunner:
         self.model = MultitaskGPModel(num_latents, num_tasks, inducing_points)
         self.likelihood = MultitaskBernoulliLikelihood()
 
-    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate=0.1, use_gpu=True):
+    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate=0.1, use_gpu=True, init_lengthscale=None, init_variance=None):
         if use_gpu:
             self.model = self.model.cuda()
             self.likelihood = self.likelihood.cuda()
@@ -158,15 +158,15 @@ class MultitaskSubgroupClassificationRunner:
         self.model.train()
         self.likelihood.train()
 
-        init_lengthscale = 1
-        init_variance = 1
-        self.model.covar_module.base_kernel.kernels[0].lengthscale = init_lengthscale
-        self.model.covar_module.base_kernel.kernels[1].variance = init_variance
-        all_params = set(self.model.parameters())
-        model_params = list(all_params - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale, 
-                                          self.model.covar_module.base_kernel.kernels[1].raw_variance})
         model_params = self.model.parameters()
-
+        if init_lengthscale is not None:
+            self.model.covar_module.base_kernel.kernels[0].lengthscale = init_lengthscale
+            model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
+        
+        if init_variance is not None:
+            self.model.covar_module.base_kernel.kernels[1].variance = init_variance
+            model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
+        
         # for name, param in self.model.named_parameters():
         #     print(name, param.data)
         

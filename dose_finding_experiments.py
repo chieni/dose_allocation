@@ -160,22 +160,22 @@ class DoseFindingExperiment:
         mask = np.isin(test_x, dose_labels)
         # Select safe doses using UCB of toxicity distribution
         # safe_dose_set = tox_dist.upper.numpy()[mask] <= self.dose_scenario.toxicity_threshold
-        ucb = tox_dist.mean.numpy()[mask] + (beta_param * tox_dist.upper_width.numpy()[mask]) 
+        ucb = tox_dist.mean.cpu().numpy()[mask] + (beta_param * tox_dist.upper_width.cpu().numpy()[mask]) 
         safe_dose_set = ucb <= self.dose_scenario.toxicity_threshold
 
         # Select expanders of toxicity distribution?
 
         # Select optimal dose using EI of efficacy distribution
         xi = 0.01
-        mean = eff_dist.mean
-        std = np.sqrt(eff_dist.variance)
-        mean_optimum = eff_dist.samples.mean(axis=0).max()
+        mean = eff_dist.mean.cpu().numpy()
+        std = np.sqrt(eff_dist.variance.cpu().numpy())
+        mean_optimum = eff_dist.samples.mean(axis=0).max().cpu().numpy()
         imp = mean - mean_optimum - xi
         Z = imp / std
         ei = (imp * scipy.stats.norm.cdf(Z)) + (std * scipy.stats.norm.pdf(Z))
         ei[std == 0.0] = 0.0
         ei = ei[mask]
-        plot_ei = torch.clone(ei)
+        plot_ei = np.copy(ei)
 
         ei[~safe_dose_set] = -np.inf
         max_ei = ei.max()
@@ -194,13 +194,16 @@ class DoseFindingExperiment:
 
     def _plot_dose_selection_helper(self, ax, train_x, train_y, true_x, true_y, test_x, dist,
                                     acqui_vals, acqui_label, selected_dose, threshold=None):
-        test_x = test_x.numpy()
+        test_x = test_x.cpu().numpy()
+        markevery_mask = np.isin(test_x, true_x)
+        markevery = np.arange(len(test_x))[markevery_mask].tolist()
+        gp_predicted = dist.mean.cpu().numpy()
+
         ax.scatter(train_x, train_y, s=40, c='k', alpha=0.1, label='Training Data')
-        ax.plot(test_x, dist.mean, 'b-',
-                markevery=np.isin(test_x, true_x), marker='o',label='GP Predicted')
+        ax.plot(test_x, gp_predicted, 'b-', markevery=markevery, marker='o',label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')
         if dist.lower is not None and dist.upper is not None:
-            ax.fill_between(dist.x_axis, dist.lower, dist.upper, alpha=0.5)
+            ax.fill_between(dist.x_axis.cpu(), dist.lower.cpu(), dist.upper.cpu(), alpha=0.5)
         ax.plot(true_x, acqui_vals, 'gray', label=acqui_label, marker='o')
         ax.plot(true_x[selected_dose], acqui_vals[selected_dose], 'r', marker='o')
         if threshold is not None:
@@ -299,27 +302,27 @@ class DoseFindingExperiment:
             
         # Select dose with highest utility that is below toxicity threshold
         for subgroup_idx in range(self.patient_scenario.num_subgroups):
-            tox_mean = tox_dists[subgroup_idx].mean[mask]
-            eff_mean = eff_dists[subgroup_idx].mean[mask]
-            tox_upper_width = tox_dists[subgroup_idx].upper_width[mask]
+            tox_mean = tox_dists[subgroup_idx].mean[mask].cpu().numpy()
+            eff_mean = eff_dists[subgroup_idx].mean[mask].cpu().numpy()
+            tox_upper_width = tox_dists[subgroup_idx].upper_width[mask].cpu().numpy()
 
             # safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
-            ucb = tox_mean.numpy() + (beta_param * tox_upper_width.numpy()) 
+            ucb = tox_mean + (beta_param * tox_upper_width) 
             safe_dose_set = ucb <= self.dose_scenario.toxicity_threshold
             
-            utilities = self.calculate_dose_utility(tox_mean.numpy(), eff_mean.numpy())
+            utilities = self.calculate_dose_utility(tox_mean, eff_mean)
             utilities[~safe_dose_set] = -np.inf
 
             print(f"Final utilities: {utilities}")
             best_dose_idx = np.argmax(utilities)
-            best_dose_val = eff_mean.numpy()[best_dose_idx]
+            best_dose_val = eff_mean[best_dose_idx]
 
             # If recommended dose is above eff threshold and utility is positive, assign this dose.
             if best_dose_val >= self.dose_scenario.efficacy_threshold and utilities[best_dose_idx] >= 0:
                 dose_rec[subgroup_idx] = best_dose_idx
             
             else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
-                dose_options = eff_mean.numpy() * safe_dose_set
+                dose_options = eff_mean * safe_dose_set
                 mtd_eff = np.max(dose_options)
                 mtd_idx = np.argmax(dose_options)
                 if mtd_eff >= self.dose_scenario.efficacy_threshold:
@@ -352,14 +355,17 @@ class DoseFindingExperiment:
         ax.legend()
     
     def _plot_subgroup_gp_results_helper(self, ax, train_x, train_y, true_x, true_y, test_x, dist):
+        test_x = test_x.cpu().numpy()
+        markevery_mask = np.isin(test_x, true_x)
+        markevery = np.arange(len(test_x))[markevery_mask].tolist()
+        gp_predicted = dist.mean.cpu().numpy()
+
         sns.set()
         ax.scatter(train_x, train_y, s=40, c='k', alpha=0.1, label='Training Data')
-        
-        ax.plot(test_x, dist.mean, 'b-',
-                markevery=np.isin(test_x, true_x), marker='o',label='GP Predicted')
+        ax.plot(test_x, gp_predicted, 'b-', markevery=markevery, marker='o',label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')
         if dist.lower is not None and dist.upper is not None:
-            ax.fill_between(dist.x_axis, dist.lower, dist.upper, alpha=0.5)
+            ax.fill_between(dist.x_axis.cpu(), dist.lower.cpu(), dist.upper.cpu(), alpha=0.5)
         ax.set_ylim([0, 1.1])
         ax.legend()
     
@@ -418,10 +424,13 @@ class DoseFindingExperiment:
         plt.savefig(f"{results_dir}/all_trials_plot.png")
 
     def _plot_subgroup_trial_gp_results_helper(self, ax, rep_means, test_x, true_x, true_y):
+        markevery_mask = np.isin(test_x, true_x)
+        markevery = np.arange(len(test_x))[markevery_mask].tolist()
+
         sns.set()
         mean = np.mean(rep_means, axis=0)
         ci = 1.96 * np.std(rep_means, axis=0) / np.sqrt(rep_means.shape[0])
-        ax.plot(test_x, mean, 'b-', markevery=np.isin(test_x, true_x), marker='o', label='GP Predicted')
+        ax.plot(test_x, mean, 'b-', markevery=markevery, marker='o', label='GP Predicted')
         ax.plot(true_x, true_y, 'g-', marker='o', label='True')
         ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
         ax.set_ylim([0, 1.1])
@@ -450,26 +459,26 @@ class DoseFindingExperiment:
     
     def run_separate_subgroup_gps(self, num_latents, num_tasks, num_inducing_pts, num_epochs, train_x,
                                   tox_train_y, eff_train_y, test_x, patients, num_subgroups,
-                                  num_confidence_samples, learning_rate):
+                                  num_confidence_samples, learning_rate, use_gpu, init_lengthscale, init_variance):
         '''
         Separate for each subgroup and each task (tox/eff).
         '''
         patients = torch.LongTensor(patients)
         tox_runner = MultitaskSubgroupClassificationRunner(num_latents, num_tasks, self.dose_scenario.dose_labels)
-        tox_runner.train(train_x, tox_train_y, patients, num_epochs, learning_rate)
+        tox_runner.train(train_x, tox_train_y, patients, num_epochs, learning_rate, use_gpu, init_lengthscale, init_variance)
         tox_dists = []
         for subgroup in range(num_subgroups):
             task_indices = torch.LongTensor([subgroup for item in range(test_x.shape[0])])
-            posterior_latent_dist, posterior_observed_dist = tox_runner.predict(test_x, task_indices)
+            posterior_latent_dist, posterior_observed_dist = tox_runner.predict(test_x, task_indices, use_gpu)
             tox_dist = self.get_bernoulli_confidence_region(test_x, posterior_latent_dist, tox_runner.likelihood, num_confidence_samples)
             tox_dists.append(tox_dist)
 
         eff_runner = MultitaskSubgroupClassificationRunner(num_latents, num_tasks, self.dose_scenario.dose_labels)
-        eff_runner.train(train_x, eff_train_y, patients, num_epochs, learning_rate)
+        eff_runner.train(train_x, eff_train_y, patients, num_epochs, learning_rate, use_gpu, init_lengthscale, init_variance)
         eff_dists = []
         for subgroup in range(num_subgroups):
             task_indices = torch.LongTensor([subgroup for item in range(test_x.shape[0])])
-            eff_posterior_latent_dist, eff_posterior_observed_dist = eff_runner.predict(test_x, task_indices)
+            eff_posterior_latent_dist, eff_posterior_observed_dist = eff_runner.predict(test_x, task_indices, use_gpu)
             eff_dist = self.get_bernoulli_confidence_region(test_x, eff_posterior_latent_dist, eff_runner.likelihood, num_confidence_samples)
             eff_dists.append(eff_dist)
         return tox_runner, eff_runner, tox_dists, eff_dists
@@ -719,7 +728,7 @@ def online_multitask_dose_example(experiment, dose_scenario, num_samples, num_ep
 
 def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
                                   num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, filepath):
+                                  cohort_size, learning_rate, beta_param, filepath, use_gpu, init_lengthscale, init_variance):
     patients = patient_scenario.generate_samples(num_samples)
     num_subgroups = dose_scenario.num_subgroups
     if not os.path.exists(filepath):
@@ -768,7 +777,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
         tox_runner, eff_runner, tox_dists, eff_dists \
             = experiment.run_separate_subgroup_gps(num_latents, num_tasks, num_inducing_pts, num_epochs, train_x,
                                                    tox_train_y, eff_train_y, test_x, patient_indices, num_subgroups,
-                                                   num_confidence_samples, learning_rate)
+                                                   num_confidence_samples, learning_rate, use_gpu, init_lengthscale, init_variance)
             
         cohort_patients = patients[timestep: timestep + cohort_size]
         print(f"Cohort patients: {cohort_patients}")
@@ -837,7 +846,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
     tox_runner, eff_runner, tox_dists, eff_dists \
         = experiment.run_separate_subgroup_gps(num_latents, num_tasks, num_inducing_pts, num_epochs, train_x,
                                                tox_train_y, eff_train_y, test_x, patients, num_subgroups,
-                                               num_confidence_samples, learning_rate)
+                                               num_confidence_samples, learning_rate, use_gpu, init_lengthscale, init_variance)
     for subgroup_idx in range(num_subgroups):
         print(f"Tox dist {subgroup_idx}: {tox_dists[subgroup_idx].mean[mask]}")
         print(f"Eff dist {subgroup_idx}: {eff_dists[subgroup_idx].mean[mask]}")
@@ -1026,7 +1035,8 @@ def online_multitask_dose_example_trials(dose_scenario, patient_scenario, num_sa
 
 def online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
                                         num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                        cohort_size, learning_rate, num_reps, beta_param, results_dir):
+                                        cohort_size, learning_rate, num_reps, beta_param, results_dir,
+                                        use_gpu, init_lengthscale, init_variance):
     metrics = []
     true_x = dose_scenario.dose_labels.astype(np.float32)
     test_x = np.concatenate([np.arange(true_x.min(), true_x.max(), 0.05, dtype=np.float32), true_x])
@@ -1044,11 +1054,11 @@ def online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_sam
         filepath = f"{results_dir}/trial{trial}"
         trial_metrics, tox_dists, eff_dists = online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
                                   num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, filepath)
+                                  cohort_size, learning_rate, beta_param, filepath, use_gpu, init_lengthscale, init_variance)
         metrics.append(trial_metrics)
         for subgroup_idx in range(patient_scenario.num_subgroups):
-            tox_means[trial, subgroup_idx, :] = tox_dists[subgroup_idx].mean
-            eff_means[trial, subgroup_idx, :] = eff_dists[subgroup_idx].mean
+            tox_means[trial, subgroup_idx, :] = tox_dists[subgroup_idx].mean.cpu()
+            eff_means[trial, subgroup_idx, :] = eff_dists[subgroup_idx].mean.cpu()
         
     
         with open(f"{filepath}/tox_means.npy", 'wb') as f:
@@ -1064,12 +1074,7 @@ def online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_sam
 def main():
     dose_scenario = DoseFindingScenarios.subgroups_example_1()
     patient_scenario = TrialPopulationScenarios.equal_population(2)
-
-    # dose_scenario = DoseFindingScenarios.lee_synthetic_example()
-    # patient_scenario = TrialPopulationScenarios.lee_trial_population()
-
-    # dose_scenario = DoseFindingScenarios.aziz_synthetic_1()
-    # patient_scenario = TrialPopulationScenarios.homogenous_population()
+    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
 
     num_samples = 51
     num_epochs = 300
@@ -1079,20 +1084,23 @@ def main():
     num_tasks = patient_scenario.num_subgroups
     num_inducing_pts = dose_scenario.num_doses
 
-    experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
+    num_reps = 2
+    cohort_size = 3
+    learning_rate = 0.01
+    beta_param = 0.5
+    use_gpu = True
+    init_lengthscale = 1
+    init_variance = 1
 
     # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
     # multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples,
     #                        num_latents, num_tasks, num_inducing_pts)
 
-
-    cohort_size = 3
     # online_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples, cohort_size)
     # online_multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, cohort_size, num_latents,
     #                               num_tasks, num_inducing_pts)
     
-    num_reps = 100
     # dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs, num_confidence_samples, num_reps)
     # multitask_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps)
@@ -1102,8 +1110,8 @@ def main():
     #                                      num_confidence_samples, cohort_size, num_latents,
     #                                      num_tasks, num_inducing_pts, num_reps)
 
-    learning_rate = 0.01
-    beta_param = 0.5
+
+
     # subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
     # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
@@ -1115,7 +1123,8 @@ def main():
     
     online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
                                         num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp8")
+                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp8",
+                                        use_gpu, init_lengthscale, init_variance)
 
 
 main()
