@@ -1135,6 +1135,7 @@ def parse_args():
     parser.add_argument("--num_latents", type=int, help="Number of latent variables")
     parser.add_argument("--beta_param", type=float, help="Beta parameter")
     parser.add_argument("--learning_rate", type=float, help="Learning rate")
+    parser.add_argument("--use_gpu", action="store_true", help="Use GPU")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     args = parser.parse_args()
 
@@ -1142,11 +1143,12 @@ def parse_args():
     num_latents = args.num_latents
     beta_param = args.beta_param
     learning_rate = args.learning_rate
+    use_gpu = args.use_gpu
     run_one = args.run_one
-    return filepath, num_latents, beta_param, learning_rate, run_one
+    return filepath, num_latents, beta_param, learning_rate, use_gpu, run_one
     
 
-def run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_one):
+def run_main_experiment(filepath, num_latents, beta_param, learning_rate, use_gpu, run_one):
     dose_scenario = DoseFindingScenarios.subgroups_example_1()
     patient_scenario = TrialPopulationScenarios.equal_population(2)
     experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
@@ -1160,7 +1162,6 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_on
     num_epochs = 300
     num_confidence_samples = 10000
 
-    use_gpu = False
     init_lengthscale = None
     init_variance = None
 
@@ -1208,8 +1209,8 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_on
     
 
 def main():
-    filepath, num_latents, beta_param, learning_rate, run_one = parse_args()
-    run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_one)
+    filepath, num_latents, beta_param, learning_rate, use_gpu, run_one = parse_args()
+    run_main_experiment(filepath, num_latents, beta_param, learning_rate, use_gpu, run_one)
 
 main()
 
