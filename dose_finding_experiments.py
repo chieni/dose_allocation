@@ -231,6 +231,7 @@ class DoseFindingExperiment:
         plt.figtext(0.5, 0.01, f"Subgroup, dose, tox, eff: {cohort_outcomes}", wrap=True, horizontalalignment='center', fontsize=12)
         plt.tight_layout()
         plt.savefig(f"{filepath}plot.png", dpi=300)
+        plt.close()
 
     
     def select_dose_empirically(self, tox_estimate, eff_estimate, N_choose, beta_param=1.):
@@ -308,7 +309,7 @@ class DoseFindingExperiment:
 
             # safe_dose_set = tox_mean.numpy() <= self.dose_scenario.toxicity_threshold
             ucb = tox_mean + (beta_param * tox_upper_width) 
-            safe_dose_set = ucb <= self.dose_scenario.toxicity_threshold
+            safe_dose_set = tox_mean <= self.dose_scenario.toxicity_threshold
             
             utilities = self.calculate_dose_utility(tox_mean, eff_mean)
             utilities[~safe_dose_set] = -np.inf
@@ -387,6 +388,7 @@ class DoseFindingExperiment:
                                                   test_x, eff_dists[subgroup_idx])
         plt.tight_layout()
         plt.savefig(f"{filepath}/plot.png", dpi=300)
+        plt.close()
 
     def plot_trial_gp_results(self, tox_means, eff_means, test_x, dose_labels):
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
@@ -422,6 +424,7 @@ class DoseFindingExperiment:
 
         fig.tight_layout()
         plt.savefig(f"{results_dir}/all_trials_plot.png")
+        plt.close()
 
     def _plot_subgroup_trial_gp_results_helper(self, ax, rep_means, test_x, true_x, true_y):
         markevery_mask = np.isin(test_x, true_x)
@@ -1084,12 +1087,12 @@ def main():
     num_tasks = patient_scenario.num_subgroups
     num_inducing_pts = dose_scenario.num_doses
 
-    num_reps = 2
+    num_reps = 100
     cohort_size = 3
     learning_rate = 0.01
     beta_param = 0.5
-    use_gpu = True
-    init_lengthscale = 1
+    use_gpu = False
+    init_lengthscale = 2
     init_variance = 1
 
     # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
@@ -1116,14 +1119,15 @@ def main():
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
     # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                               cohort_size, learning_rate, beta_param, "results/sixteen_example")
+    #                               cohort_size, learning_rate, beta_param, "results/twentyone_example",
+    #                               use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
     #                               learning_rate, "results/exp5")
     
     online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
                                         num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp8",
+                                        cohort_size, learning_rate, num_reps, beta_param, "results/exp9",
                                         use_gpu, init_lengthscale, init_variance)
 
 

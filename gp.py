@@ -27,8 +27,6 @@ class ClassificationGPModel(gpytorch.models.ApproximateGP):
 
 class MultitaskGPModel(gpytorch.models.ApproximateGP):
     def __init__(self, num_latents, num_tasks, inducing_points):
-        #inducing_points = torch.rand(num_latents, num_inducing_pts, 1)
-        inducing_points = inducing_points[[1, 3]]
         inducing_points = torch.tensor(inducing_points)
         inducing_points = inducing_points.repeat(num_latents, 1)
         inducing_points = torch.unsqueeze(inducing_points, 2)
