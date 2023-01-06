@@ -900,11 +900,13 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
             print(name, param.data)
     eff_lengthscale = np.squeeze(eff_runner.model.covar_module.base_kernel.kernels[0].lengthscale.detach().cpu().numpy())
     eff_variance = np.squeeze(eff_runner.model.covar_module.base_kernel.kernels[1].variance.detach().cpu().numpy())
+    outputscale = np.squeeze(eff_runner.model.covar_module.outputscale.detach().cpu().numpy())
 
     model_params_frame = pd.DataFrame({'tox_lengthscale': tox_lengthscale,
                                        'tox_variance': tox_variance,
                                        'eff_lengthscale': eff_lengthscale,
-                                       'eff_variance': eff_variance},
+                                       'eff_variance': eff_variance,
+                                       'output_scale': outputscale},
                                        index=[0])
     print(model_params_frame)
         
@@ -1133,16 +1135,18 @@ def parse_args():
     parser.add_argument("--num_latents", type=int, help="Number of latent variables")
     parser.add_argument("--beta_param", type=float, help="Beta parameter")
     parser.add_argument("--learning_rate", type=float, help="Learning rate")
+    parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     args = parser.parse_args()
 
     filepath = args.filepath
     num_latents = args.num_latents
     beta_param = args.beta_param
     learning_rate = args.learning_rate
-    return filepath, num_latents, beta_param, learning_rate
+    run_one = args.run_one
+    return filepath, num_latents, beta_param, learning_rate, run_one
     
 
-def run_main_experiment(filepath, num_latents, beta_param, learning_rate):
+def run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_one):
     dose_scenario = DoseFindingScenarios.subgroups_example_1()
     patient_scenario = TrialPopulationScenarios.equal_population(2)
     experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
@@ -1163,18 +1167,16 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate):
     true_utilities = experiment.calculate_dose_utility(dose_scenario.toxicity_probs, dose_scenario.efficacy_probs)
     print(f"True utilities: {true_utilities}")
 
-    online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
-                                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                        cohort_size, learning_rate, num_reps, beta_param, filepath,
-                                        use_gpu, init_lengthscale, init_variance)
-
-    # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
-    #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                               cohort_size, learning_rate, beta_param, filepath,
-    #                               use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
-
-
-
+    if run_one:
+        online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
+                                    num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+                                    cohort_size, learning_rate, beta_param, filepath,
+                                    use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
+    else:
+        online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                                            num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+                                            cohort_size, learning_rate, num_reps, beta_param, filepath,
+                                            use_gpu, init_lengthscale, init_variance)
 
 
     # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
@@ -1206,8 +1208,8 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate):
     
 
 def main():
-    filepath, num_latents, beta_param, learning_rate = parse_args()
-    run_main_experiment(filepath, num_latents, beta_param, learning_rate)
+    filepath, num_latents, beta_param, learning_rate, run_one = parse_args()
+    run_main_experiment(filepath, num_latents, beta_param, learning_rate, run_one)
 
 main()
 
