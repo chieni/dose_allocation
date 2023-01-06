@@ -46,7 +46,9 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
         super().__init__(variational_strategy)
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([num_latents]))
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])) + gpytorch.kernels.LinearKernel(),
+            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])) + \
+                gpytorch.kernels.LinearKernel(batch_shape=torch.Size([num_latents]),
+                                              variance_constraint=gpytorch.constraints.Positive()),
             batch_shape=torch.Size([num_latents]) 
         )
 

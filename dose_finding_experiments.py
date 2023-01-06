@@ -75,7 +75,7 @@ class DoseExperimentMetrics:
 class DoseExperimentSubgroupMetrics:
     def __init__(self, num_samples, patients, num_subgroups, toxicities, efficacies,
                  selected_doses, optimal_doses, final_dose_error, utilities, final_utilities,
-                 final_dose_rec):
+                 final_dose_rec, model_params):
         self.num_samples = num_samples
         self.patients = patients
         self.num_subgroups = num_subgroups
@@ -86,6 +86,8 @@ class DoseExperimentSubgroupMetrics:
         self.final_utilities = pd.DataFrame(final_utilities, columns=np.arange(final_utilities.shape[1]))
         self.final_dose_rec = pd.DataFrame({'final_dose_rec': final_dose_rec})
         self.final_dose_rec['subgroup_idx'] = self.final_dose_rec.index
+
+        self.model_params = model_params
 
         self.frame = pd.DataFrame({
             'subgroup_idx': patients,
@@ -122,7 +124,12 @@ class DoseExperimentSubgroupMetrics:
         dose_recs_grouped = dose_recs_grouped.rename(columns={0: 'count'})
         print(dose_recs_grouped)
         dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
-        
+
+        model_params_trials = pd.concat([df.model_params for df in metrics_list])
+        model_params_grouped = model_params_trials.groupby(model_params_trials.index).mean()
+        print(model_params_grouped)
+        model_params_grouped.to_csv(f"{filepath}/trials_model_params.csv")
+
     def save_metrics(self, filepath):
         self.frame.to_csv(f"{filepath}/raw_metrics.csv")
         metrics_frame = self.groups_frame[['toxicity', 'efficacy', 'utility', 'dose_error', 'final_dose_error']]
@@ -138,6 +145,7 @@ class DoseExperimentSubgroupMetrics:
             print(dose_selections)
         self.final_utilities.to_csv(f"{filepath}/final_utilities.csv")
         self.final_dose_rec.to_csv(f"{filepath}/final_dose_rec.csv")
+        self.model_params.to_csv(f"{filepath}/final_model_params.csv")
 
 
 class DoseFindingExperiment:
@@ -326,13 +334,13 @@ class DoseFindingExperiment:
             safe_dose_set = tox_mean <= self.dose_scenario.toxicity_threshold
 
             print(f"Final safe dose set: {safe_dose_set}")
-            
             utilities = self.calculate_dose_utility(tox_mean, eff_mean)
             utilities[~safe_dose_set] = -np.inf
             final_utilities[subgroup_idx, :] = utilities
 
             print(f"Final utilities: {utilities}")
-            best_dose_idx = np.argmax(utilities)
+            max_utility = utilities.max()
+            best_dose_idx = np.where(utilities == max_utility)[0][-1]
             best_dose_val = eff_mean[best_dose_idx]
 
             # If recommended dose is above eff threshold and utility is positive, assign this dose.
@@ -881,9 +889,22 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
         print(f"Tox dist {subgroup_idx}: {tox_dists[subgroup_idx].mean[mask]}")
         print(f"Eff dist {subgroup_idx}: {eff_dists[subgroup_idx].mean[mask]}")
 
-    # Select final doses (by subgroup)
-    # final_dose_error = experiment.select_final_dose_subgroups(dose_labels, test_x, tox_dists, eff_dists)
+    for name, param in tox_runner.model.named_parameters():
+            print(name, param.data)
+    tox_lengthscale = np.squeeze(tox_runner.model.covar_module.base_kernel.kernels[0].lengthscale.detach().cpu().numpy())
+    tox_variance = np.squeeze(tox_runner.model.covar_module.base_kernel.kernels[1].variance.detach().cpu().numpy())
 
+    for name, param in eff_runner.model.named_parameters():
+            print(name, param.data)
+    eff_lengthscale = np.squeeze(eff_runner.model.covar_module.base_kernel.kernels[0].lengthscale.detach().cpu().numpy())
+    eff_variance = np.squeeze(eff_runner.model.covar_module.base_kernel.kernels[1].variance.detach().cpu().numpy())
+
+    model_params_frame = pd.DataFrame({'tox_lengthscale': tox_lengthscale,
+                                       'tox_variance': tox_variance,
+                                       'eff_lengthscale': eff_lengthscale,
+                                       'eff_variance': eff_variance})
+    print(model_params_frame)
+        
     final_dose_error, final_utilities, final_dose_rec \
         = experiment.select_final_dose_subgroups_utility(dose_labels, test_x, tox_dists, eff_dists, beta_param)
 
@@ -894,7 +915,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
 
     experiment_metrics = DoseExperimentSubgroupMetrics(num_samples, patients, num_subgroups, tox_train_y.numpy(), eff_train_y.numpy(), 
                                                        selected_doses, dose_scenario.optimal_doses, final_dose_error, utilities,
-                                                       final_utilities, final_dose_rec)
+                                                       final_utilities, final_dose_rec, model_params_frame)
 
     experiment_metrics.save_metrics(filepath)
     experiment.plot_subgroup_gp_results(train_x.numpy(), tox_train_y.numpy(), eff_train_y.numpy(), patients, num_subgroups,
@@ -1116,13 +1137,16 @@ def main():
     num_tasks = patient_scenario.num_subgroups
     num_inducing_pts = dose_scenario.num_doses
 
-    num_reps = 100
+    num_reps = 2
     cohort_size = 3
     learning_rate = 0.01
     beta_param = 0.2
     use_gpu = False
-    init_lengthscale = 2
-    init_variance = 1
+    init_lengthscale = None
+    init_variance = None
+
+    true_utilities = experiment.calculate_dose_utility(dose_scenario.toxicity_probs, dose_scenario.efficacy_probs)
+    print(f"True utilities: {true_utilities}")
 
     # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
     # multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples,
@@ -1146,9 +1170,10 @@ def main():
 
     # subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
+
     online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
                                   num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, "results/twentyfive_example",
+                                  cohort_size, learning_rate, beta_param, "results/34_example",
                                   use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
@@ -1156,7 +1181,7 @@ def main():
     
     # online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                                     num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                                     cohort_size, learning_rate, num_reps, beta_param, "results/exp10",
+    #                                     cohort_size, learning_rate, num_reps, beta_param, "results/exp11",
     #                                     use_gpu, init_lengthscale, init_variance)
 
 
