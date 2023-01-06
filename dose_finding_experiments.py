@@ -1208,9 +1208,6 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate, use_gp
     #                               learning_rate, "results/exp5")
     
 
-def main():
+if __name__ == "__main__":
     filepath, num_latents, beta_param, learning_rate, use_gpu, run_one = parse_args()
     run_main_experiment(filepath, num_latents, beta_param, learning_rate, use_gpu, run_one)
-
-main()
-

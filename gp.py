@@ -46,10 +46,13 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
         super().__init__(variational_strategy)
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([num_latents]))
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])) + \
+            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
+                                       lengthscale_prior=gpytorch.priors.LogNormalPrior(0.4, 0.5)) + \
             gpytorch.kernels.LinearKernel(batch_shape=torch.Size([num_latents]),
+                                          variance_prior=gpytorch.priors.LogNormalPrior(-0.25, 0.5),
                                           variance_constraint=gpytorch.constraints.Positive()),
-            batch_shape=torch.Size([num_latents])
+            batch_shape=torch.Size([num_latents]),
+            outputscale_prior=gpytorch.priors.LogNormalPrior(-0.25, 0.5)
         )
 
     def forward(self, x):
