@@ -1,6 +1,8 @@
 import os
+import argparse
 import math
 import pickle
+
 import numpy as np
 import scipy.stats
 import torch
@@ -1125,30 +1127,55 @@ def online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_sam
 
 
 
-def main():
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--filepath", type=str, help="File path name")
+    parser.add_argument("--num_latents", type=int, help="Number of latent variables")
+    parser.add_argument("--beta_param", type=float, help="Beta parameter")
+    parser.add_argument("--learning_rate", type=float, help="Learning rate")
+    args = parser.parse_args()
+
+    filepath = args.filepath
+    num_latents = args.num_latents
+    beta_param = args.beta_param
+    learning_rate = args.learning_rate
+    return filepath, num_latents, beta_param, learning_rate
+    
+
+def run_main_experiment(filepath, num_latents, beta_param, learning_rate):
     dose_scenario = DoseFindingScenarios.subgroups_example_1()
     patient_scenario = TrialPopulationScenarios.equal_population(2)
     experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
 
+    num_tasks = patient_scenario.num_subgroups
+    num_inducing_pts = dose_scenario.num_doses
+
+    num_reps = 100
+    cohort_size = 3
     num_samples = 51
     num_epochs = 300
     num_confidence_samples = 10000
 
-    num_latents = 1
-    num_tasks = patient_scenario.num_subgroups
-    num_inducing_pts = dose_scenario.num_doses
-
-    num_reps = 2
-    cohort_size = 3
-    learning_rate = 0.01
-    beta_param = 0.2
     use_gpu = False
     init_lengthscale = None
     init_variance = None
-    filepath = "results/37_example"
 
     true_utilities = experiment.calculate_dose_utility(dose_scenario.toxicity_probs, dose_scenario.efficacy_probs)
     print(f"True utilities: {true_utilities}")
+
+    online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
+                                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+                                        cohort_size, learning_rate, num_reps, beta_param, filepath,
+                                        use_gpu, init_lengthscale, init_variance)
+
+    # online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
+    #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
+    #                               cohort_size, learning_rate, beta_param, filepath,
+    #                               use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
+
+
+
+
 
     # dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples)
     # multitask_dose_example(experiment, dose_scenario, num_samples, num_epochs, num_confidence_samples,
@@ -1173,19 +1200,14 @@ def main():
     # subgroups_dose_example(experiment, dose_scenario, num_samples, num_epochs,
     #                        num_confidence_samples, num_latents, num_tasks, num_inducing_pts, learning_rate)
 
-    online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
-                                  num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, filepath,
-                                  use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
     #                               learning_rate, "results/exp5")
     
-    # online_subgroup_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
-    #                                     num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-    #                                     cohort_size, learning_rate, num_reps, beta_param, "results/exp11",
-    #                                     use_gpu, init_lengthscale, init_variance)
 
+def main():
+    filepath, num_latents, beta_param, learning_rate = parse_args()
+    run_main_experiment(filepath, num_latents, beta_param, learning_rate)
 
 main()
 
