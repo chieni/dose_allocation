@@ -902,7 +902,8 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
     model_params_frame = pd.DataFrame({'tox_lengthscale': tox_lengthscale,
                                        'tox_variance': tox_variance,
                                        'eff_lengthscale': eff_lengthscale,
-                                       'eff_variance': eff_variance})
+                                       'eff_variance': eff_variance},
+                                       index=[0])
     print(model_params_frame)
         
     final_dose_error, final_utilities, final_dose_rec \
@@ -1133,7 +1134,7 @@ def main():
     num_epochs = 300
     num_confidence_samples = 10000
 
-    num_latents = 3
+    num_latents = 1
     num_tasks = patient_scenario.num_subgroups
     num_inducing_pts = dose_scenario.num_doses
 
@@ -1144,6 +1145,7 @@ def main():
     use_gpu = False
     init_lengthscale = None
     init_variance = None
+    filepath = "results/37_example"
 
     true_utilities = experiment.calculate_dose_utility(dose_scenario.toxicity_probs, dose_scenario.efficacy_probs)
     print(f"True utilities: {true_utilities}")
@@ -1173,7 +1175,7 @@ def main():
 
     online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, num_samples, num_epochs,
                                   num_confidence_samples, num_latents, num_tasks, num_inducing_pts,
-                                  cohort_size, learning_rate, beta_param, "results/34_example",
+                                  cohort_size, learning_rate, beta_param, filepath,
                                   use_gpu=use_gpu, init_lengthscale=init_lengthscale, init_variance=init_variance)
     # subgroups_dose_example_trials(dose_scenario, patient_scenario, num_samples, num_epochs,
     #                               num_confidence_samples, num_latents, num_tasks, num_inducing_pts, num_reps,
