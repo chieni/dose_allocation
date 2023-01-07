@@ -321,7 +321,7 @@ def main():
 
 def main2():
     reps = 100 # num of simulated trials
-    num_patients = 50
+    num_patients = 51
     learning_rate = 0.01
 
     scenario = DoseFindingScenarios.subgroups_example_1()

@@ -1159,7 +1159,7 @@ def run_main_experiment(filepath, num_latents, beta_param, learning_rate, use_gp
     num_reps = 100
     cohort_size = 3
     num_samples = 51
-    num_epochs = 300
+    num_epochs = 500
     num_confidence_samples = 10000
 
     init_lengthscale = None

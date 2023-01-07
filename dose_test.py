@@ -27,14 +27,14 @@ num_subgroups = dose_scenario.num_subgroups
 num_reps = 100
 cohort_size = 3
 num_samples = 51
-num_epochs = 300
+num_epochs = 500
 num_confidence_samples = 10000
-num_latents = 1
+num_latents = 2
 learning_rate = 0.01
 beta_param = 0.5
-filepath = "results/54_example"
+filepath = "results/74_example"
 
-offline_data_frame = pd.read_csv("results/exp12/trial19/raw_metrics.csv")
+offline_data_frame = pd.read_csv("results/56_example/raw_metrics.csv")
 
 patients = offline_data_frame['subgroup_idx'].values
 selected_doses = offline_data_frame['selected_dose'].values
@@ -70,7 +70,7 @@ model_params_frame = pd.DataFrame({'tox_lengthscale': tox_lengthscale,
                                     'eff_lengthscale': eff_lengthscale,
                                     'eff_variance': eff_variance,
                                     'output_scale': outputscale},
-                                    index=[0])
+                                    index=np.arange(num_latents))
 
 final_dose_error, final_utilities, final_dose_rec \
         = experiment.select_final_dose_subgroups_utility(dose_labels, test_x, tox_dists, eff_dists, beta_param)
