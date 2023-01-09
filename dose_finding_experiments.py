@@ -907,7 +907,7 @@ def online_subgroups_dose_example(experiment, dose_scenario, patient_scenario, n
                                        'eff_lengthscale': eff_lengthscale,
                                        'eff_variance': eff_variance,
                                        'output_scale': outputscale},
-                                       index=[0])
+                                       index=np.arange(num_latents))
     print(model_params_frame)
         
     final_dose_error, final_utilities, final_dose_rec \
