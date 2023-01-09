@@ -14,7 +14,7 @@ import seaborn as sns
 class DoseFindingScenario:
     def __init__(self, dose_labels, toxicity_probs, efficacy_probs, optimal_doses,
                  toxicity_threshold, efficacy_threshold, tox_models=None, eff_models=None,
-                 dose_range=None, p_param=None):
+                 dose_range=None, p_param=None, tox_weight=None, eff_weight=None):
         self.num_doses = len(dose_labels)
         if len(toxicity_probs.shape) > 1:
             self.num_subgroups = toxicity_probs.shape[0]
@@ -30,6 +30,8 @@ class DoseFindingScenario:
         self.eff_models = eff_models
         self.dose_range = dose_range
         self.p_param = p_param
+        self.tox_weight = tox_weight
+        self.eff_weight = eff_weight
 
     @staticmethod
     def calculate_utility_param(tox_threshold, eff_threshold, midpoint):
@@ -254,7 +256,8 @@ class DoseFindingScenarios:
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
-                                   dose_range=dose_range, p_param=p_param)
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1., eff_weight=1.)
     
     @staticmethod
     def sigmoidal_model_example():
