@@ -84,24 +84,20 @@ class MultitaskClassificationRunner:
         self.likelihood.train()
 
         model_params = self.model.parameters()
-        # self.model.covar_module.base_kernel.lengthscale = 2
-        # self.model.variational_strategy.lmc_coefficients = torch.tensor([[1, 0], [0, 1]], dtype=torch.float32)
-        # model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.raw_lengthscale})
-        # model_params = list(set(model_params) - {self.model.variational_strategy.lmc_coefficients})
-        
-        self.model.covar_module.base_kernel.kernels[0].lengthscale = 1.5
+
+        self.model.mean_module.constant = 0
+        self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         self.model.covar_module.base_kernel.kernels[1].variance = 1
         self.model.covar_module.base_kernel.outputscale = 1
+        self.model.variational_strategy.lmc_coefficients = torch.nn.Parameter(torch.tensor([[1., 1], [0, 0.1]]))
         model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
         model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
         model_params = list(set(model_params) - {self.model.covar_module.raw_outputscale})
+        model_params = list(set(model_params) - {self.model.variational_strategy.lmc_coefficients})
+        model_params = list(set(model_params) - {self.model.mean_module.raw_constant})
         
         optimizer = torch.optim.Adam([{'params': model_params},
                                       {'params': self.likelihood.parameters()},], lr=learning_rate)
-
-
-        # optimizer = torch.optim.Adam([{'params': self.model.parameters()},
-        #                               {'params': self.likelihood.parameters()},], lr=learning_rate)
 
         mll = gpytorch.mlls.VariationalELBO(self.likelihood, self.model, num_data=train_y.size(0))
         epochs_iter = tqdm.tqdm(range(num_epochs), desc="Epoch")
@@ -112,6 +108,9 @@ class MultitaskClassificationRunner:
             epochs_iter.set_postfix(loss=loss.item())
             loss.backward()
             optimizer.step()
+    
+        for name, param in self.model.named_parameters():
+            print(name, param.data)
     
     def predict(self, test_x, task_indices, use_gpu):
         self.model.eval()

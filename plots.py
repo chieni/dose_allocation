@@ -84,3 +84,33 @@ def plot_gp_timestep(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_
     plt.tight_layout()
     plt.savefig(filename, dpi=300)
     plt.close()
+
+def _plot_gp_trials(ax, rep_means, test_x, true_x, true_y):
+    markevery_mask = np.isin(test_x, true_x)
+    markevery = np.arange(len(test_x))[markevery_mask].tolist()
+
+    sns.set()
+    mean = np.mean(rep_means, axis=0)
+    ci = 1.96 * np.std(rep_means, axis=0) / np.sqrt(rep_means.shape[0])
+    ax.plot(test_x, mean, 'b-', markevery=markevery, marker='o', label='GP Predicted')
+    ax.plot(true_x, true_y, 'g-', marker='o', label='True')
+    ax.fill_between(test_x, (mean-ci), (mean+ci), alpha=0.5)
+    ax.set_ylim([0, 1.1])
+    ax.legend()
+
+def plot_gp_trials(tox_means, eff_means, test_x,
+                   dose_labels, tox_probs, eff_probs,
+                   num_subgroups, results_dir):
+    fig, axs = plt.subplots(num_subgroups, 2, figsize=(8, 8))
+    for subgroup_idx in range(num_subgroups):
+        axs[subgroup_idx, 0].set_title(f"Toxicity - Subgroup {subgroup_idx}")
+        axs[subgroup_idx, 1].set_title(f"Efficacy - Subgroup {subgroup_idx}")
+        _plot_gp_trials(axs[subgroup_idx, 0], tox_means[:, subgroup_idx, :], test_x,
+                             dose_labels, tox_probs[subgroup_idx, :])
+        _plot_gp_trials(axs[subgroup_idx, 1], eff_means[:, subgroup_idx, :], test_x,
+                             dose_labels, eff_probs[subgroup_idx, :])
+
+    fig.tight_layout()
+    plt.savefig(f"{results_dir}/all_trials_plot.png")
+    plt.close()
+

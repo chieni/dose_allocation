@@ -13,19 +13,20 @@ import matplotlib.pyplot as plt
 
 from data_generation import DoseFindingScenarios, TrialPopulationScenarios
 from new_gp import MultitaskClassificationRunner, MultitaskGPModel
-from plots import plot_gp, plot_gp_timestep
+from plots import plot_gp, plot_gp_timestep, plot_gp_trials
 from experiment_utils import PosteriorPrediction
 
 
 class DoseExperimentMetrics:
     def __init__(self, dose_scenario, subgroup_indices, selected_doses, tox_outcomes, eff_outcomes,
-                 tox_predicted, eff_predicted, final_selected_doses, final_utilities):
+                 tox_predicted, tox_upper, eff_predicted, final_selected_doses, final_utilities):
         self.num_subgroups = final_selected_doses.shape[0]
         self.subgroup_indices = subgroup_indices
         self.selected_doses = selected_doses
         self.tox_outcomes = tox_outcomes
         self.eff_outcomes = eff_outcomes
         self.tox_predicted = tox_predicted
+        self.tox_upper = tox_upper
         self.eff_predicted = eff_predicted
         self.final_selected_doses = final_selected_doses
         self.optimal_doses = dose_scenario.optimal_doses
@@ -72,17 +73,47 @@ class DoseExperimentMetrics:
         for subgroup_idx in range(self.num_subgroups):
             predicted_frame = pd.DataFrame({
                 'tox_predicted': self.tox_predicted[subgroup_idx, :],
+                'tox_upper': self.tox_upper[subgroup_idx, :],
                 'eff_predicted': self.eff_predicted[subgroup_idx, :],
                 'final_utilities': self.final_utilities[subgroup_idx, :]
             })
             self.subgroup_predictions.append(predicted_frame)
-    
+
+        # Get dose allocation counts
+        dose_counts_frame = self.metrics_frame[['subgroup_idx', 'selected_dose']].groupby('subgroup_idx')['selected_dose'].apply(list)
+        self.dose_counts_frame = dose_counts_frame.apply(lambda x: pd.Series(x).value_counts())
+
+    @classmethod
+    def save_merged_metrics(cls, metrics_list, filepath):
+        frame = pd.concat([df.grouped_metrics_frame for df in metrics_list])
+        grouped_frame = frame.groupby(frame.index)
+        mean_frame = grouped_frame.mean()
+        var_frame = grouped_frame.var()
+        mean_frame = mean_frame[['tox_outcome', 'eff_outcome', 'utility', 'dose_error', 'final_dose_error']]
+        var_frame = var_frame[['tox_outcome', 'eff_outcome', 'utility', 'dose_error', 'final_dose_error']]
+
+        print(mean_frame)
+        print(var_frame)
+        mean_frame.to_csv(f"{filepath}/final_metric_means.csv")
+        var_frame.to_csv(f"{filepath}/final_metric_var.csv")
+
+        dose_counts = pd.concat([df.dose_counts_frame for df in metrics_list])
+        dose_counts_mean = dose_counts.groupby(level=0).mean()
+        print(dose_counts_mean)
+        dose_counts_mean.to_csv(f"{filepath}/all_dose_counts.csv")
+
+        dose_recs = pd.concat([df.final_dose_rec for df in metrics_list])
+        dose_recs_grouped = dose_recs.groupby('subgroup_idx').value_counts().reset_index()
+        dose_recs_grouped = dose_recs_grouped.rename(columns={0: 'count'})
+        print(dose_recs_grouped)
+        dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
+
     def save_metrics(self, filepath):
+        self.dose_counts_frame.to_csv(f"{filepath}/dose_counts.csv")
         self.metrics_frame.to_csv(f"{filepath}/timestep_metrics.csv")
         overall_metrics_frame = self.grouped_metrics_frame[['tox_outcome', 'eff_outcome', 'utility', 'dose_error', 'final_dose_error']]
         overall_metrics_frame.to_csv(f"{filepath}/overall_metrics.csv")
         
-        print(self.metrics_frame)
         print(overall_metrics_frame)
         for subgroup_idx in range(self.num_subgroups):
             print(f"Subgroup: {subgroup_idx}")
@@ -93,8 +124,9 @@ class DoseExperimentMetrics:
             
             # print(f"Dose allocations: {dose_selections}")
             self.subgroup_predictions[subgroup_idx].to_csv(f"{filepath}/{subgroup_idx}_predictions.csv")
-            print(f"Predictions: {self.subgroup_predictions[subgroup_idx]}")
+            print(self.subgroup_predictions[subgroup_idx])
 
+        print(self.final_dose_rec)
         self.final_dose_rec.to_csv(f"{filepath}/final_dose_rec.csv")
 
 def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
@@ -143,17 +175,20 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
         
     # Select dose with highest utility that is below toxicity threshold
     for subgroup_idx in range(num_subgroups):
-        # Find UCB for toxicity posteriors to determine safe set
-        tox_mean = tox_posteriors.mean[subgroup_idx, :]
-        tox_upper = tox_posteriors.upper[subgroup_idx, :]
+        # Determine safe dose set on posterior means
+        tox_mean = tox_posteriors.mean[subgroup_idx, :][x_mask]
+        tox_upper = tox_posteriors.upper[subgroup_idx, :][x_mask]
         tox_conf_interval = tox_upper - tox_mean
         tox_ucb = tox_mean + (beta_param * tox_conf_interval)
 
-        dose_set_mask = tox_ucb[x_mask] <= tox_thre
+        dose_set_mask = tox_ucb <= tox_thre
+        gt_threshold = np.where(tox_ucb > tox_thre)[0]
+        if gt_threshold.size:
+            first_idx_above_threshold = gt_threshold[0]
+            dose_set_mask[first_idx_above_threshold:] = False
         print(f"Dose set: {dose_set_mask}")
 
         # Calculate utilities
-        tox_mean = tox_mean[x_mask]
         eff_mean = eff_posteriors.mean[subgroup_idx, :][x_mask]
         utilities = calculate_utility(tox_mean, eff_mean, tox_thre, eff_thre,
                                       tox_weight, eff_weight)
@@ -168,6 +203,15 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
         # If recommended dose is above eff threshold assign this dose, else assign no dose.
         if best_dose_val >= eff_thre: 
             dose_rec[subgroup_idx] = best_dose_idx
+        # TODO: Try going for next highest utility etc
+        
+        else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
+            print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
+            eff_mean[~dose_set_mask] = -np.inf
+            max_eff = eff_mean.max()
+            if max_eff >= eff_thre:
+                max_eff_idx = np.where(eff_mean == max_eff)[0][-1]
+                dose_rec[subgroup_idx] = max_eff_idx
     
     print(f"Final doses: {dose_rec}")
     return dose_rec, final_utilities
@@ -253,9 +297,7 @@ def offline_dose_finding():
             patient_scenario.num_subgroups, x_test, y_tox_latents, y_eff_latents,
             f"{save_filepath}/gp_latents_plot")
 
-def online_dose_finding():
-    # Filepath to save data to
-    filepath = "results/87_example"
+def online_dose_finding(filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param, learning_rate, final_beta_param):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -266,13 +308,9 @@ def online_dose_finding():
         os.makedirs(latent_plots_filepath)
 
     # Hyperparameters
-    beta_param = 0.5
-    num_latents = 2
     num_epochs = 300
-    learning_rate = 0.01
     use_gpu = False
     num_confidence_samples = 1000
-    num_samples = 51
 
     lengthscale_prior = gpytorch.priors.LogNormalPrior(0.4, 0.5)
     outputscale_prior = gpytorch.priors.LogNormalPrior(-0.25, 0.5)
@@ -280,9 +318,6 @@ def online_dose_finding():
     # outputscale_prior = None
 
     cohort_size = 3
-
-    dose_scenario = DoseFindingScenarios.subgroups_example_1()
-    patient_scenario = TrialPopulationScenarios.equal_population(2)
 
     dose_labels = dose_scenario.dose_labels
     num_subgroups = patient_scenario.num_subgroups
@@ -377,23 +412,19 @@ def online_dose_finding():
             tox_conf_interval = tox_upper - tox_mean
             tox_ucb = tox_mean + (beta_param * tox_conf_interval)
             tox_acqui_funcs[subgroup_idx, :] = tox_ucb
+
             safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
+            gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+
+            if gt_threshold.size:
+                first_idx_above_threshold = gt_threshold[0]
+                safe_doses_mask[first_idx_above_threshold:] = False
             print(f"Safe doses: {safe_doses_mask}")
 
             dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
             print(f"Dose set: {safe_doses_mask}")
 
             ## Select optimal dose using EI of efficacy posteriors
-            # eff_upper = y_eff_posteriors.upper[subgroup_idx, :]
-            # eff_conf_interval = eff_upper - eff_mean
-            # eff_ucb = eff_mean + (beta_param * eff_conf_interval)
-            # eff_acqui_funcs[subgroup_idx, :] = eff_ucb
-            # dose_eff_ucb = eff_ucb[x_mask]
-            # dose_eff_ucb[~dose_set_mask] = -np.inf
-
-            # max_eff_ucb = dose_eff_ucb.max()
-            # selected_dose = np.where(dose_eff_ucb == max_eff_ucb)[0][-1]
-
             tradeoff_param = 0.01
             eff_mean = y_eff_posteriors.mean[subgroup_idx, :]
             eff_stdev = np.sqrt(y_eff_posteriors.variance[subgroup_idx, :])
@@ -482,17 +513,75 @@ def online_dose_finding():
                                                               dose_scenario.toxicity_threshold,
                                                               dose_scenario.efficacy_threshold,
                                                               dose_scenario.tox_weight,
-                                                              dose_scenario.eff_weight, beta_param)
-    print(f"Final selected doses: {final_selected_doses}")
+                                                              dose_scenario.eff_weight, final_beta_param)
 
     experiment_metrics = DoseExperimentMetrics(dose_scenario, patients, selected_doses,
-                                               tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask], y_eff_posteriors.mean[:, x_mask], final_selected_doses, final_utilities)
+                                               tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask], y_tox_posteriors.upper[:, x_mask], 
+                                               y_eff_posteriors.mean[:, x_mask], final_selected_doses, final_utilities)
     experiment_metrics.save_metrics(filepath)
     
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             x_test, y_tox_posteriors, y_eff_posteriors, f"{filepath}/final_gp_plot")
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             x_test, y_tox_latents, y_eff_latents, f"{filepath}/final_gp_latents_plot")
+    
+    return experiment_metrics, y_tox_posteriors, y_eff_posteriors
 
 
-online_dose_finding()
+def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
+                               num_samples, num_latents, beta_param, learning_rate, final_beta_param):
+    metrics = []
+    x_true = dose_scenario.dose_labels.astype(np.float32)
+    x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
+    x_test = np.unique(x_test)
+    np.sort(x_test)
+    x_test = torch.tensor(x_test, dtype=torch.float32)
+
+    tox_means = np.empty((num_trials, patient_scenario.num_subgroups, x_test.shape[0]))
+    eff_means = np.empty((num_trials, patient_scenario.num_subgroups, x_test.shape[0]))
+    for trial in range(num_trials):
+        print(f"Trial {trial}")
+        filepath = f"{results_dir}/trial{trial}"
+        trial_metrics, tox_posteriors, eff_posteriors = online_dose_finding(filepath,
+                                                                            dose_scenario,
+                                                                            patient_scenario,
+                                                                            num_samples,
+                                                                            num_latents,
+                                                                            beta_param,
+                                                                            learning_rate,
+                                                                            final_beta_param)
+        metrics.append(trial_metrics)
+
+        for subgroup_idx in range(patient_scenario.num_subgroups):
+            tox_means[trial, subgroup_idx, :] = tox_posteriors.mean[subgroup_idx, :]
+            eff_means[trial, subgroup_idx, :] = eff_posteriors.mean[subgroup_idx, :]
+
+    with open(f"{results_dir}/tox_means.npy", 'wb') as f:
+        np.save(f, tox_means)
+    with open(f"{results_dir}/eff_means.npy", 'wb') as f:
+        np.save(f, eff_means)
+    
+    DoseExperimentMetrics.save_merged_metrics(metrics, results_dir)
+    plot_gp_trials(tox_means, eff_means, x_test,
+                   dose_scenario.dose_labels, dose_scenario.toxicity_probs,
+                   dose_scenario.efficacy_probs,
+                   patient_scenario.num_subgroups, results_dir)
+
+
+filepath = "results/exp22"
+num_trials = 100
+num_samples = 51
+num_latents = 2
+beta_param = 0.2
+learning_rate = 0.01
+final_beta_param = 0.
+dose_scenario = DoseFindingScenarios.subgroups_example_1()
+patient_scenario = TrialPopulationScenarios.equal_population(2)
+
+# online_dose_finding(filepath, dose_scenario, patient_scenario,
+#                     num_samples, num_latents, beta_param, learning_rate,
+#                     final_beta_param)
+
+online_dose_finding_trials(filepath, num_trials, dose_scenario, patient_scenario,
+                           num_samples, num_latents, beta_param, learning_rate,
+                           final_beta_param)
