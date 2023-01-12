@@ -18,7 +18,7 @@ def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_
     eff_term[eff_means < eff_thre] = 0.
     return (tox_weight * tox_term) + (eff_weight * eff_term)
 
-filepath = "results/exp21"
+filepath = "results/exp22"
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 num_trials = 100
@@ -46,11 +46,10 @@ for trial in range(num_trials):
         if gt_threshold.size:
             first_idx_above_threshold = gt_threshold[0]
             dose_set_mask[first_idx_above_threshold:] = False
-    
 
         utilities = calculate_utility(tox_means, eff_means, dose_scenario.toxicity_threshold,
                                       dose_scenario.efficacy_threshold,
-                                      1, 4)
+                                      1, 2)
         thall_utilities = calculate_dose_utility_thall(tox_means, eff_means,
                                                        dose_scenario.toxicity_threshold,
                                                        dose_scenario.efficacy_threshold,
@@ -60,21 +59,27 @@ for trial in range(num_trials):
         utilities[~dose_set_mask] = -np.inf
         thall_utilities[~dose_set_mask] = -np.inf
 
-        # max_eff = eff_means.max()
-        # if max_eff >= dose_scenario.efficacy_threshold:
-        #     max_eff_idx = np.where(eff_means == max_eff)[0][-1]
-        #     dose_rec[trial, subgroup_idx] = max_eff_idx
+        max_eff = eff_means.max()
+        max_eff_idx = np.where(eff_means == max_eff)[0][-1]
 
         max_util = utilities.max()
         max_util_idx = np.where(utilities == max_util)[0][-1]
+
+        max_util_thall = thall_utilities.max()
+        max_util_thall_idx = np.where(thall_utilities == max_util_thall)[0][-1]
+        
+        # if max_eff >= dose_scenario.efficacy_threshold:
+        #     dose_rec[trial, subgroup_idx] = max_eff_idx
+
         if eff_means[max_util_idx] >= dose_scenario.efficacy_threshold:
             dose_rec[trial, subgroup_idx] = max_util_idx
+        else:
+            # Try highest eff in safe range
+            if max_eff >= dose_scenario.efficacy_threshold:
+                dose_rec[trial, subgroup_idx] = max_eff_idx
 
-        # max_util = thall_utilities.max()
-        # max_util_idx = np.where(thall_utilities == max_util)[0][-1]
-        # dose_rec[trial, subgroup_idx] = max_util_idx
-        # if eff_means[max_util_idx] >= dose_scenario.efficacy_threshold:
-        #     dose_rec[trial, subgroup_idx] = max_util_idx
+        # if eff_means[max_util_thall_idx] >= dose_scenario.efficacy_threshold:
+        #     dose_rec[trial, subgroup_idx] = max_util_thall_idx
 
         
     dose_err[trial, :] = (dose_rec[trial, :] != optimal_doses).astype(np.float32)

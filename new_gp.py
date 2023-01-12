@@ -85,7 +85,7 @@ class MultitaskClassificationRunner:
 
         model_params = self.model.parameters()
 
-        self.model.mean_module.constant = 0
+        self.model.mean_module.constant = 0.05
         self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         self.model.covar_module.base_kernel.kernels[1].variance = 1
         self.model.covar_module.base_kernel.outputscale = 1
@@ -109,8 +109,8 @@ class MultitaskClassificationRunner:
             loss.backward()
             optimizer.step()
     
-        for name, param in self.model.named_parameters():
-            print(name, param.data)
+        # for name, param in self.model.named_parameters():
+        #     print(name, param.data)
     
     def predict(self, test_x, task_indices, use_gpu):
         self.model.eval()
