@@ -375,7 +375,8 @@ def offline_dose_finding():
 
 def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         num_samples, num_latents, beta_param, learning_rate,
-                        final_beta_param, sampling_timesteps, increase_beta_param):
+                        final_beta_param, sampling_timesteps, increase_beta_param,
+                        use_gpu):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -387,7 +388,6 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     # Hyperparameters
     num_epochs = 300
-    use_gpu = False
     num_confidence_samples = 1000
 
     lengthscale_prior = gpytorch.priors.LogNormalPrior(0.4, 0.5)
@@ -599,7 +599,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
 def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
                                num_samples, num_latents, beta_param, learning_rate, final_beta_param,
-                               sampling_timesteps, increase_beta_param):
+                               sampling_timesteps, increase_beta_param, use_gpu):
     metrics = []
     x_true = dose_scenario.dose_labels.astype(np.float32)
     x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
@@ -616,7 +616,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
         trial_metrics, tox_posteriors, eff_posteriors, util_func = online_dose_finding(
             filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param,
             learning_rate, final_beta_param,
-            sampling_timesteps, increase_beta_param)
+            sampling_timesteps, increase_beta_param, use_gpu)
         metrics.append(trial_metrics)
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
@@ -647,15 +647,16 @@ learning_rate = 0.01
 final_beta_param = 0.
 sampling_timesteps = 15
 increase_beta_param = False
+use_gpu = False
 
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 
 online_dose_finding(filepath, dose_scenario, patient_scenario,
                     num_samples, num_latents, beta_param, learning_rate,
-                    final_beta_param, sampling_timesteps, increase_beta_param)
+                    final_beta_param, sampling_timesteps, increase_beta_param, use_gpu)
 
 # online_dose_finding_trials(filepath, num_trials, dose_scenario,
 #                            patient_scenario, num_samples, num_latents,
 #                            beta_param, learning_rate, final_beta_param,
-#                            sampling_timesteps, increase_beta_param)
+#                            sampling_timesteps, increase_beta_param, use_gpu)
