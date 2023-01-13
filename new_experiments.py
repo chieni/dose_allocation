@@ -638,7 +638,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, results_dir)
 
 
-filepath = "results/108_example"
+filepath = "results/exp16"
 num_trials = 100
 num_samples = 51
 num_latents = 2
@@ -647,16 +647,16 @@ learning_rate = 0.01
 final_beta_param = 0.
 sampling_timesteps = 15
 increase_beta_param = False
-use_gpu = False
+use_gpu = True
 
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 
-online_dose_finding(filepath, dose_scenario, patient_scenario,
-                    num_samples, num_latents, beta_param, learning_rate,
-                    final_beta_param, sampling_timesteps, increase_beta_param, use_gpu)
+# online_dose_finding(filepath, dose_scenario, patient_scenario,
+#                     num_samples, num_latents, beta_param, learning_rate,
+#                     final_beta_param, sampling_timesteps, increase_beta_param, use_gpu)
 
-# online_dose_finding_trials(filepath, num_trials, dose_scenario,
-#                            patient_scenario, num_samples, num_latents,
-#                            beta_param, learning_rate, final_beta_param,
-#                            sampling_timesteps, increase_beta_param, use_gpu)
+online_dose_finding_trials(filepath, num_trials, dose_scenario,
+                           patient_scenario, num_samples, num_latents,
+                           beta_param, learning_rate, final_beta_param,
+                           sampling_timesteps, increase_beta_param, use_gpu)

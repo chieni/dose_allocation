@@ -29,14 +29,7 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
         )
 
         super().__init__(variational_strategy)
-        # self.mean_module = gpytorch.means.LinearMean(1, batch_shape=torch.Size([num_latents]))
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([num_latents]))
-        # self.covar_module = gpytorch.kernels.ScaleKernel(
-        #     gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
-        #                                lengthscale_prior=lengthscale_prior),
-        #     batch_shape=torch.Size([num_latents]),
-        #     outputscale_prior=outputscale_prior
-        # )
         self.covar_module = gpytorch.kernels.ScaleKernel(
             gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
                                        lengthscale_prior=lengthscale_prior) + \
@@ -73,12 +66,14 @@ class MultitaskClassificationRunner:
         self.likelihood = MultitaskBernoulliLikelihood()
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
+        lmcs_coeffs = torch.tensor([[1., 1], [0, 0.1]])
         if use_gpu:
             self.model = self.model.cuda()
             self.likelihood = self.likelihood.cuda()
             train_x = train_x.cuda()
             train_y = train_y.cuda()
             task_indices = task_indices.cuda()
+            lmc_coeffs = lmcs_coeffs.cuda()
 
         self.model.train()
         self.likelihood.train()
@@ -88,7 +83,7 @@ class MultitaskClassificationRunner:
         self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         self.model.covar_module.base_kernel.kernels[1].variance = 1
         self.model.covar_module.base_kernel.outputscale = 1
-        self.model.variational_strategy.lmc_coefficients = torch.nn.Parameter(torch.tensor([[1., 1], [0, 0.1]]))
+        self.model.variational_strategy.lmc_coefficients = torch.nn.Parameter(lmc_coeffs)
         model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
         model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
         model_params = list(set(model_params) - {self.model.covar_module.raw_outputscale})
