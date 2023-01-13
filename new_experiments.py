@@ -441,8 +441,10 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     x_test = np.unique(x_test)
     np.sort(x_test)
     x_test = torch.tensor(x_test, dtype=torch.float32)
+    np_x_test = x_test.numpy()
 
     x_mask = np.isin(x_test, dose_labels)
+    markevery = np.arange(len(x_test))[x_mask].tolist()
     timestep += cohort_size
 
     while timestep < num_samples:
@@ -544,13 +546,13 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
         # Plot timestep
         plot_gp_timestep(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
-                         num_subgroups, x_test, y_tox_posteriors, y_eff_posteriors, 
+                         num_subgroups, np_x_test, y_tox_posteriors, y_eff_posteriors, 
                          tox_acqui_funcs, eff_acqui_funcs, util_func, selected_dose_by_subgroup,
-                         f"{plots_filepath}/timestep{timestep}")
+                         markevery, x_mask, f"{plots_filepath}/timestep{timestep}")
 
-        plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
-                patient_scenario.num_subgroups, x_test, y_tox_latents, y_eff_latents,
-                util_func, f"{latent_plots_filepath}/timestep{timestep}")
+        # plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
+        #         patient_scenario.num_subgroups, np_x_test, y_tox_latents, y_eff_latents,
+        #         util_func, markevery, f"{latent_plots_filepath}/timestep{timestep}")
         
         timestep += cohort_size
 
@@ -605,9 +607,9 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                        dose_scenario.tox_weight, dose_scenario.eff_weight)
 
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
-            x_test, y_tox_posteriors, y_eff_posteriors, util_func, f"{filepath}/final_gp_plot")
+            np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, markevery, f"{filepath}/final_gp_plot")
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
-            x_test, y_tox_latents, y_eff_latents, util_func, f"{filepath}/final_gp_latents_plot")
+            np_x_test, y_tox_latents, y_eff_latents, util_func, markevery, f"{filepath}/final_gp_latents_plot")
     
     return experiment_metrics, y_tox_posteriors, y_eff_posteriors, util_func
 
@@ -647,17 +649,19 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
             np.save(f, util_vals[trial, :, :])
     
     DoseExperimentMetrics.save_merged_metrics(metrics, results_dir)
+    x_mask = np.isin(x_test, x_true)
+    markevery = np.arange(len(x_test))[x_mask].tolist()
     plot_gp_trials(tox_means, eff_means, util_vals, x_test,
                    dose_scenario.dose_labels, dose_scenario.toxicity_probs,
                    dose_scenario.efficacy_probs,
-                   patient_scenario.num_subgroups, results_dir)
+                   patient_scenario.num_subgroups, markevery, results_dir)
 
 
-filepath = "results/109_example"
-beta_param = 0.2
+filepath = "results/111_example"
+beta_param = 0.3
 sampling_timesteps = 0
-increase_beta_param = False
-use_utility = True
+increase_beta_param = True
+use_utility = False
 use_gpu = False
 
 num_trials = 100
