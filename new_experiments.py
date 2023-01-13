@@ -630,8 +630,8 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
             np.save(f, tox_means[trial, :, :])
         with open(f"{results_dir}/trial{trial}/eff_means.npy", 'wb') as f:
             np.save(f, eff_means[trial, :, :])
-        with open(f"{results_dir}/trial{trial}/util_func.npy", 'wb') as f:
-            np.save(f, util_func[trial, :, :])
+        with open(f"{results_dir}/trial{trial}/util_vals.npy", 'wb') as f:
+            np.save(f, util_vals[trial, :, :])
     
     DoseExperimentMetrics.save_merged_metrics(metrics, results_dir)
     plot_gp_trials(tox_means, eff_means, util_vals, x_test,
