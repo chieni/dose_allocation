@@ -203,7 +203,9 @@ def select_dose_from_sample(num_doses, max_dose, tox_mean, eff_mean, x_mask):
     return selected_dose
 
 def select_dose(num_doses, max_dose, tox_mean, tox_upper,
-                eff_mean, eff_variance, x_mask, beta_param):
+                eff_mean, eff_variance, x_mask, beta_param,
+                tox_thre, eff_thre, tox_weight, eff_weight,
+                use_utility=False):
     ## Select ideal dose for subgroup
     # Available doses are current max dose idx + 1
     available_dose_indices = np.arange(max_dose + 2)
@@ -235,10 +237,18 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
     eff_ei = (improvement * scipy.stats.norm.cdf(z_val)) + (eff_stdev * scipy.stats.norm.pdf(z_val))
     eff_ei[eff_stdev == 0.] = 0.
 
-    dose_eff_ei = eff_ei[x_mask]
-    dose_eff_ei[~dose_set_mask] = -np.inf
-    max_eff_ei = dose_eff_ei.max()
-    selected_dose = np.where(dose_eff_ei == max_eff_ei)[0][-1]
+    if not use_utility:
+        dose_eff_ei = eff_ei[x_mask]
+        dose_eff_ei[~dose_set_mask] = -np.inf
+        max_eff_ei = dose_eff_ei.max()
+        selected_dose = np.where(dose_eff_ei == max_eff_ei)[0][-1]
+    else:
+        ## Select optimal dose using utility
+        utilities = calculate_utility(tox_mean[x_mask], eff_mean[x_mask], tox_thre, eff_thre,
+                                    tox_weight, eff_weight)
+        utilities[~dose_set_mask] = -np.inf
+        max_utility = utilities.max()
+        selected_dose = np.where(utilities == max_utility)[0][-1]
 
     # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
     if dose_set_mask.sum() == 0:
@@ -378,7 +388,7 @@ def offline_dose_finding():
 def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         num_samples, num_latents, beta_param, learning_rate,
                         final_beta_param, sampling_timesteps, increase_beta_param,
-                        use_gpu):
+                        use_utility, use_gpu):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -498,7 +508,10 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                             y_tox_posteriors.upper[subgroup_idx, :],
                             y_eff_posteriors.mean[subgroup_idx, :],
                             y_eff_posteriors.variance[subgroup_idx, :], x_mask,
-                            current_beta_param)
+                            current_beta_param, dose_scenario.toxicity_threshold,
+                            dose_scenario.efficacy_threshold,
+                            dose_scenario.tox_weight, dose_scenario.eff_weight,
+                            use_utility=use_utility)
                 # Calculate utility
             util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
                                                            y_eff_posteriors.mean[subgroup_idx, :],
@@ -601,7 +614,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
 def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
                                num_samples, num_latents, beta_param, learning_rate, final_beta_param,
-                               sampling_timesteps, increase_beta_param, use_gpu):
+                               sampling_timesteps, increase_beta_param, use_utility, use_gpu):
     metrics = []
     x_true = dose_scenario.dose_labels.astype(np.float32)
     x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
@@ -617,8 +630,8 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
         filepath = f"{results_dir}/trial{trial}"
         trial_metrics, tox_posteriors, eff_posteriors, util_func = online_dose_finding(
             filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param,
-            learning_rate, final_beta_param,
-            sampling_timesteps, increase_beta_param, use_gpu)
+            learning_rate, final_beta_param, sampling_timesteps, increase_beta_param,
+            use_utility, use_gpu)
         metrics.append(trial_metrics)
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
@@ -640,25 +653,29 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, results_dir)
 
 
-filepath = "results/exp16"
+filepath = "results/109_example"
+beta_param = 0.2
+sampling_timesteps = 0
+increase_beta_param = False
+use_utility = True
+use_gpu = False
+
 num_trials = 100
 num_samples = 51
 num_latents = 2
-beta_param = 0.2
 learning_rate = 0.01
 final_beta_param = 0.
-sampling_timesteps = 15
-increase_beta_param = False
-use_gpu = True
 
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 
-# online_dose_finding(filepath, dose_scenario, patient_scenario,
-#                     num_samples, num_latents, beta_param, learning_rate,
-#                     final_beta_param, sampling_timesteps, increase_beta_param, use_gpu)
+online_dose_finding(filepath, dose_scenario, patient_scenario,
+                    num_samples, num_latents, beta_param, learning_rate,
+                    final_beta_param, sampling_timesteps, increase_beta_param,
+                    use_utility, use_gpu)
 
-online_dose_finding_trials(filepath, num_trials, dose_scenario,
-                           patient_scenario, num_samples, num_latents,
-                           beta_param, learning_rate, final_beta_param,
-                           sampling_timesteps, increase_beta_param, use_gpu)
+# online_dose_finding_trials(filepath, num_trials, dose_scenario,
+#                            patient_scenario, num_samples, num_latents,
+#                            beta_param, learning_rate, final_beta_param,
+#                            sampling_timesteps, increase_beta_param, use_utility,
+#                            use_gpu)
