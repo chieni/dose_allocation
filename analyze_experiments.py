@@ -10,21 +10,21 @@ dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
 
-filepath = "results/exp12"
-num_trials = 89
+filepath = "results/24"
+num_trials = 78
 metrics_frames = []
 dose_rec_frames = []
 model_params_frames = []
 
 for trial in range(num_trials):
-    metrics_frame = pd.read_csv(f"{filepath}/trial{trial}/metrics.csv")
+    metrics_frame = pd.read_csv(f"{filepath}/trial{trial}/timestep_metrics.csv")
     metrics_frames.append(metrics_frame)
 
     dose_rec_frame = pd.read_csv(f"{filepath}/trial{trial}/final_dose_rec.csv")
     dose_rec_frames.append(dose_rec_frame)
 
-    model_params_frame = pd.read_csv(f"{filepath}/trial{trial}/final_model_params.csv")
-    model_params_frames.append(model_params_frame)
+    # model_params_frame = pd.read_csv(f"{filepath}/trial{trial}/final_model_params.csv")
+    # model_params_frames.append(model_params_frame)
 
 frame = pd.concat(metrics_frames)
 grouped_frame = frame.groupby(frame.index)
@@ -43,10 +43,10 @@ dose_recs_grouped = dose_recs_grouped.rename(columns={0: 'count'})
 print(dose_recs_grouped)
 dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
 
-model_params_trials = pd.concat(model_params_frames)
-model_params_grouped = model_params_trials.groupby(model_params_trials.index).mean()
-print(model_params_grouped)
-model_params_grouped.to_csv(f"{filepath}/trials_model_params.csv")
+# model_params_trials = pd.concat(model_params_frames)
+# model_params_grouped = model_params_trials.groupby(model_params_trials.index).mean()
+# print(model_params_grouped)
+# model_params_grouped.to_csv(f"{filepath}/trials_model_params.csv")
 
 
 true_x = dose_scenario.dose_labels.astype(np.float32)

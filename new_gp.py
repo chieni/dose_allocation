@@ -84,7 +84,6 @@ class MultitaskClassificationRunner:
         self.likelihood.train()
 
         model_params = self.model.parameters()
-
         self.model.mean_module.constant = 0.05
         self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         self.model.covar_module.base_kernel.kernels[1].variance = 1

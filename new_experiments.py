@@ -121,12 +121,6 @@ class DoseExperimentMetrics:
         print(overall_metrics_frame)
         for subgroup_idx in range(self.num_subgroups):
             print(f"Subgroup: {subgroup_idx}")
-            # mask = self.subgroup_indices == subgroup_idx
-            # dose_selections = np.array(np.unique(self.selected_doses[mask], return_counts=True)).T
-            # with open(f"{filepath}/{subgroup_idx}_dose_selections.npy", 'wb') as f:
-            #     np.save(f, dose_selections)
-            
-            # print(f"Dose allocations: {dose_selections}")
             self.subgroup_predictions[subgroup_idx].to_csv(f"{filepath}/{subgroup_idx}_predictions.csv")
             print(self.subgroup_predictions[subgroup_idx])
 
@@ -169,6 +163,14 @@ def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples,
         y_posteriors.set_variables(subgroup_idx, mean, lower, upper, variance)
         y_latents.set_variables(subgroup_idx, post_latents.mean, latent_lower, latent_upper)
     return y_posteriors, y_latents
+
+def sample_one_posterior(runner, num_subgroups, x_test, use_gpu):
+    y_samples = PosteriorPrediction(num_subgroups, len(x_test))
+    for subgroup_idx in range(num_subgroups):
+        test_task_indices = torch.LongTensor(np.repeat(subgroup_idx, len(x_test)))
+        _, post_observed = runner.predict(x_test, test_task_indices, use_gpu)
+        y_samples.set_variables(subgroup_idx, post_observed.mean[np.random.randint(0, 10), :])
+    return y_samples
 
 def select_dose_from_sample(num_doses, max_dose, tox_mean, eff_mean, x_mask):
     ## Select ideal dose for subgroup
@@ -373,7 +375,7 @@ def offline_dose_finding():
 
 def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         num_samples, num_latents, beta_param, learning_rate,
-                        final_beta_param, sampling_timesteps):
+                        final_beta_param, sampling_timesteps, increase_beta_param):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -433,18 +435,18 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     while timestep < num_samples:
         print(f"Timestep: {timestep}")
-        # Train model
+        current_beta_param = np.float32(beta_param)
+        if increase_beta_param:
+            param_val = beta_param - (2 * beta_param) + (0.05 * (timestep/cohort_size))
+            if param_val < beta_param:
+                current_beta_param = np.float32(param_val)
+        print(f"Beta param: {current_beta_param}")
 
         # Construct training data
         task_indices = torch.LongTensor(patients[:timestep])
         x_train = torch.tensor(selected_dose_values, dtype=torch.float32)
         y_tox_train = torch.tensor(tox_outcomes, dtype=torch.float32)
         y_eff_train = torch.tensor(eff_outcomes, dtype=torch.float32)
-
-        print(f"task_indices: {task_indices}")
-        print(f"x_train: {x_train}")
-        print(f"y_tox_train: {y_tox_train}")
-        print(f"y_eff_train: {y_eff_train}")
 
         # Train model
         tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
@@ -466,10 +468,10 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                                 x_test, num_confidence_samples, use_gpu)
 
         # Sample one func
-        y_tox_sample, _ = get_model_predictions(tox_runner, patient_scenario.num_subgroups,
-                                                                  x_test, 1, use_gpu)
-        y_eff_sample, _ = get_model_predictions(eff_runner, patient_scenario.num_subgroups,
-                                                                  x_test, 1, use_gpu)
+        y_tox_sample = sample_one_posterior(tox_runner, patient_scenario.num_subgroups,
+                                            x_test, use_gpu)
+        y_eff_sample = sample_one_posterior(eff_runner, patient_scenario.num_subgroups,
+                                            x_test, use_gpu)
 
         # Get dose selections
         selected_dose_by_subgroup = np.empty(num_subgroups, dtype=np.int32)
@@ -494,7 +496,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                             y_tox_posteriors.upper[subgroup_idx, :],
                             y_eff_posteriors.mean[subgroup_idx, :],
                             y_eff_posteriors.variance[subgroup_idx, :], x_mask,
-                            beta_param)
+                            current_beta_param)
                 # Calculate utility
             util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
                                                            y_eff_posteriors.mean[subgroup_idx, :],
@@ -555,7 +557,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                             dose_labels, lengthscale_prior=lengthscale_prior,
                                             outputscale_prior=outputscale_prior)
     eff_runner.train(x_train, y_eff_train, task_indices,
-                    num_epochs, learning_rate, use_gpu)
+                     num_epochs, learning_rate, use_gpu)
     
     # Get model predictions
     y_tox_posteriors, y_tox_latents = get_model_predictions(tox_runner, patient_scenario.num_subgroups,
@@ -573,8 +575,9 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                               dose_scenario.eff_weight, final_beta_param)
 
     experiment_metrics = DoseExperimentMetrics(dose_scenario, patients, selected_doses,
-                                               tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask], y_tox_posteriors.upper[:, x_mask], 
-                                               y_eff_posteriors.mean[:, x_mask], final_selected_doses, final_utilities)
+                                               tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask],
+                                               y_tox_posteriors.upper[:, x_mask], y_eff_posteriors.mean[:, x_mask],
+                                               final_selected_doses, final_utilities)
     experiment_metrics.save_metrics(filepath)
     
     # Calculate utilities
@@ -595,7 +598,8 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
 
 def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
-                               num_samples, num_latents, beta_param, learning_rate, final_beta_param):
+                               num_samples, num_latents, beta_param, learning_rate, final_beta_param,
+                               sampling_timesteps, increase_beta_param):
     metrics = []
     x_true = dose_scenario.dose_labels.astype(np.float32)
     x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
@@ -611,7 +615,8 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
         filepath = f"{results_dir}/trial{trial}"
         trial_metrics, tox_posteriors, eff_posteriors, util_func = online_dose_finding(
             filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param,
-            learning_rate, final_beta_param)
+            learning_rate, final_beta_param,
+            sampling_timesteps, increase_beta_param)
         metrics.append(trial_metrics)
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
@@ -619,12 +624,12 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
             eff_means[trial, subgroup_idx, :] = eff_posteriors.mean[subgroup_idx, :]
             util_vals[trial, subgroup_idx, :] = util_func[subgroup_idx, :]
 
-    with open(f"{results_dir}/tox_means.npy", 'wb') as f:
-        np.save(f, tox_means)
-    with open(f"{results_dir}/eff_means.npy", 'wb') as f:
-        np.save(f, eff_means)
-    with open(f"{results_dir}/util_func.npy", 'wb') as f:
-        np.save(f, util_func)
+        with open(f"{results_dir}/trial{trial}/tox_means.npy", 'wb') as f:
+            np.save(f, tox_means[trial, :, :])
+        with open(f"{results_dir}/trial{trial}/eff_means.npy", 'wb') as f:
+            np.save(f, eff_means[trial, :, :])
+        with open(f"{results_dir}/trial{trial}/util_func.npy", 'wb') as f:
+            np.save(f, util_func[trial, :, :])
     
     DoseExperimentMetrics.save_merged_metrics(metrics, results_dir)
     plot_gp_trials(tox_means, eff_means, util_vals, x_test,
@@ -633,7 +638,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, results_dir)
 
 
-filepath = "results/105_example"
+filepath = "results/108_example"
 num_trials = 100
 num_samples = 51
 num_latents = 2
@@ -641,14 +646,16 @@ beta_param = 0.2
 learning_rate = 0.01
 final_beta_param = 0.
 sampling_timesteps = 15
+increase_beta_param = False
 
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 
 online_dose_finding(filepath, dose_scenario, patient_scenario,
                     num_samples, num_latents, beta_param, learning_rate,
-                    final_beta_param, sampling_timesteps)
+                    final_beta_param, sampling_timesteps, increase_beta_param)
 
-# online_dose_finding_trials(filepath, num_trials, dose_scenario, patient_scenario,
-#                            num_samples, num_latents, beta_param, learning_rate,
-#                            final_beta_param)
+# online_dose_finding_trials(filepath, num_trials, dose_scenario,
+#                            patient_scenario, num_samples, num_latents,
+#                            beta_param, learning_rate, final_beta_param,
+#                            sampling_timesteps, increase_beta_param)

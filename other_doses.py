@@ -18,10 +18,10 @@ def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_
     eff_term[eff_means < eff_thre] = 0.
     return (tox_weight * tox_term) + (eff_weight * eff_term)
 
-filepath = "results/exp22"
+filepath = "results/exp24"
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
-num_trials = 100
+num_trials = 78
 num_subgroups = 2
 final_beta_param = 0.
 
