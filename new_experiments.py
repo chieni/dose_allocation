@@ -160,8 +160,10 @@ def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples,
         mean, lower, upper, variance = get_bernoulli_confidence_region(post_latents, runner.likelihood, num_confidence_samples)
         latent_lower, latent_upper = post_latents.confidence_region()
 
-        y_posteriors.set_variables(subgroup_idx, mean, lower, upper, variance)
-        y_latents.set_variables(subgroup_idx, post_latents.mean, latent_lower, latent_upper)
+        y_posteriors.set_variables(subgroup_idx, mean.cpu().numpy(), lower.cpu().numpy(),
+                                   upper.cpu().numpy(), variance.cpu().numpy())
+        y_latents.set_variables(subgroup_idx, post_latents.mean.cpu().numpy(),
+                                latent_lower.cpu().numpy(), latent_upper.cpu().numpy())
     return y_posteriors, y_latents
 
 def sample_one_posterior(runner, num_subgroups, x_test, use_gpu):
@@ -169,7 +171,7 @@ def sample_one_posterior(runner, num_subgroups, x_test, use_gpu):
     for subgroup_idx in range(num_subgroups):
         test_task_indices = torch.LongTensor(np.repeat(subgroup_idx, len(x_test)))
         _, post_observed = runner.predict(x_test, test_task_indices, use_gpu)
-        y_samples.set_variables(subgroup_idx, post_observed.mean[np.random.randint(0, 10), :])
+        y_samples.set_variables(subgroup_idx, post_observed.mean[np.random.randint(0, 10), :].cpu().numpy())
     return y_samples
 
 def select_dose_from_sample(num_doses, max_dose, tox_mean, eff_mean, x_mask):
