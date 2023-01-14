@@ -159,7 +159,6 @@ def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples,
         post_latents, _ = runner.predict(x_test, test_task_indices, use_gpu)
         mean, lower, upper, variance = get_bernoulli_confidence_region(post_latents, runner.likelihood, num_confidence_samples)
         latent_lower, latent_upper = post_latents.confidence_region()
-
         y_posteriors.set_variables(subgroup_idx, mean.cpu().numpy(), lower.cpu().numpy(),
                                    upper.cpu().numpy(), variance.cpu().numpy())
         y_latents.set_variables(subgroup_idx, post_latents.mean.cpu().numpy(),
@@ -201,6 +200,43 @@ def select_dose_from_sample(num_doses, max_dose, tox_mean, eff_mean, x_mask):
     if dose_set_mask.sum() == 0:
         selected_dose = 0
     return selected_dose
+
+def select_dose_confidence(num_doses, max_dose, tox_mean, tox_upper,
+                           eff_upper, eff_lower, x_mask, beta_param):
+    ## Select ideal dose for subgroup
+    # Available doses are current max dose idx + 1
+    available_dose_indices = np.arange(max_dose + 2)
+    available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
+    print(f"Available doses: {available_doses_mask}")
+
+    # Find UCB for toxicity posteriors to determine safe set
+    tox_conf_interval = tox_upper - tox_mean
+    tox_ucb = tox_mean + (beta_param * tox_conf_interval)
+
+    safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
+    gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+
+    if gt_threshold.size:
+        first_idx_above_threshold = gt_threshold[0]
+        safe_doses_mask[first_idx_above_threshold:] = False
+    print(f"Safe doses: {safe_doses_mask}")
+
+    dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
+    print(f"Dose set: {safe_doses_mask}")
+
+    ## Select dose with efficacy at widest confidence interval
+    eff_intervals = eff_upper - eff_lower
+    dose_eff_intervals = eff_intervals[x_mask]
+    dose_eff_intervals[~dose_set_mask] = -np.inf
+    max_eff_interval = dose_eff_intervals.max()
+    selected_dose = np.where(dose_eff_intervals == max_eff_interval)[0][-1]
+   
+
+    # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+    if dose_set_mask.sum() == 0:
+        selected_dose = 0
+    return selected_dose, tox_ucb, eff_intervals
+
 
 def select_dose(num_doses, max_dose, tox_mean, tox_upper,
                 eff_mean, eff_variance, x_mask, beta_param,
@@ -437,14 +473,12 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         eff_outcomes.append(eff_outcome)
     
     # Construct test data (works for all models)
-    x_test = np.concatenate([np.arange(dose_labels.min(), dose_labels.max(), 0.05, dtype=np.float32), dose_labels])
-    x_test = np.unique(x_test)
-    np.sort(x_test)
-    x_test = torch.tensor(x_test, dtype=torch.float32)
-    np_x_test = x_test.numpy()
-
-    x_mask = np.isin(x_test, dose_labels)
-    markevery = np.arange(len(x_test))[x_mask].tolist()
+    np_x_test = np.concatenate([np.arange(dose_labels.min(), dose_labels.max(), 0.05, dtype=np.float32), dose_labels])
+    np_x_test = np.unique(np_x_test)
+    np.sort(np_x_test)
+    
+    x_mask = np.isin(np_x_test, dose_labels)
+    markevery = np.arange(len(np_x_test))[x_mask].tolist()
     timestep += cohort_size
 
     while timestep < num_samples:
@@ -461,6 +495,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         x_train = torch.tensor(selected_dose_values, dtype=torch.float32)
         y_tox_train = torch.tensor(tox_outcomes, dtype=torch.float32)
         y_eff_train = torch.tensor(eff_outcomes, dtype=torch.float32)
+        x_test = torch.tensor(np_x_test, dtype=torch.float32)
 
         # Train model
         tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
@@ -489,19 +524,29 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
         # Get dose selections
         selected_dose_by_subgroup = np.empty(num_subgroups, dtype=np.int32)
-        tox_acqui_funcs = np.empty((num_subgroups, len(x_test)))
-        eff_acqui_funcs = np.empty((num_subgroups, len(x_test)))
-        util_func = np.empty((num_subgroups, len(x_test)))
+        tox_acqui_funcs = np.empty((num_subgroups, len(np_x_test)))
+        eff_acqui_funcs = np.empty((num_subgroups, len(np_x_test)))
+        util_func = np.empty((num_subgroups, len(np_x_test)))
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
             if timestep <= sampling_timesteps:
-                print("Sampling one function")
-                selected_dose_by_subgroup[subgroup_idx]  = \
-                select_dose_from_sample(num_doses, max_doses[subgroup_idx],
-                                        y_tox_sample.mean[subgroup_idx, :],
-                                        y_eff_sample.mean[subgroup_idx, :], x_mask)
-                tox_acqui_funcs[subgroup_idx, :] = y_tox_sample.mean[subgroup_idx, :]
-                eff_acqui_funcs[subgroup_idx, :] = y_eff_sample.mean[subgroup_idx, :]
+                # print("Sampling one function")
+                # selected_dose_by_subgroup[subgroup_idx]  = \
+                # select_dose_from_sample(num_doses, max_doses[subgroup_idx],
+                #                         y_tox_sample.mean[subgroup_idx, :],
+                #                         y_eff_sample.mean[subgroup_idx, :], x_mask)
+                # tox_acqui_funcs[subgroup_idx, :] = y_tox_sample.mean[subgroup_idx, :]
+                # eff_acqui_funcs[subgroup_idx, :] = y_eff_sample.mean[subgroup_idx, :]
+
+                print("Select based on eff confidence interval.")
+                selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
+                eff_acqui_funcs[subgroup_idx, :] = select_dose_confidence(num_doses, max_doses[subgroup_idx],
+                                                                          y_tox_posteriors.mean[subgroup_idx, :],
+                                                                          y_tox_posteriors.upper[subgroup_idx, :],
+                                                                          y_eff_posteriors.upper[subgroup_idx, :],
+                                                                          y_eff_posteriors.lower[subgroup_idx, :],
+                                                                          x_mask, current_beta_param)
+
             else:
                 selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
                 eff_acqui_funcs[subgroup_idx, :] = \
@@ -598,7 +643,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     experiment_metrics.save_metrics(filepath)
     
     # Calculate utilities
-    util_func = np.empty((num_subgroups, len(x_test)))
+    util_func = np.empty((num_subgroups, len(np_x_test)))
     for subgroup_idx in range(num_subgroups):
         util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
                                                        y_eff_posteriors.mean[subgroup_idx, :],
@@ -657,10 +702,10 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, markevery, results_dir)
 
 
-filepath = "results/111_example"
-beta_param = 0.3
-sampling_timesteps = 0
-increase_beta_param = True
+filepath = "results/113_example"
+beta_param = 0.2
+sampling_timesteps = 15
+increase_beta_param = False
 use_utility = False
 use_gpu = False
 
