@@ -261,12 +261,12 @@ def select_dose_increasing(num_doses, max_dose, tox_mean, tox_upper,
     dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
     print(f"Dose set: {safe_doses_mask}")
 
-    ## Select largest safe dose
-    selected_dose = np.where(dose_set_mask == True)[0][-1]
-   
     # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
     if dose_set_mask.sum() == 0:
         selected_dose = 0
+    else:
+        ## Select largest safe dose
+        selected_dose = np.where(dose_set_mask == True)[0][-1]
     return selected_dose, tox_ucb
 
 
