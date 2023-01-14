@@ -238,6 +238,38 @@ def select_dose_confidence(num_doses, max_dose, tox_mean, tox_upper,
     return selected_dose, tox_ucb, eff_intervals
 
 
+def select_dose_increasing(num_doses, max_dose, tox_mean, tox_upper,
+                           x_mask, beta_param):
+    ## Select ideal dose for subgroup
+    # Available doses are current max dose idx + 1
+    available_dose_indices = np.arange(max_dose + 2)
+    available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
+    print(f"Available doses: {available_doses_mask}")
+
+    # Find UCB for toxicity posteriors to determine safe set
+    tox_conf_interval = tox_upper - tox_mean
+    tox_ucb = tox_mean + (beta_param * tox_conf_interval)
+
+    safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
+    gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+
+    if gt_threshold.size:
+        first_idx_above_threshold = gt_threshold[0]
+        safe_doses_mask[first_idx_above_threshold:] = False
+    print(f"Safe doses: {safe_doses_mask}")
+
+    dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
+    print(f"Dose set: {safe_doses_mask}")
+
+    ## Select largest safe dose
+    selected_dose = np.where(dose_set_mask == True)[0][-1]
+   
+    # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+    if dose_set_mask.sum() == 0:
+        selected_dose = 0
+    return selected_dose, tox_ucb
+
+
 def select_dose(num_doses, max_dose, tox_mean, tox_upper,
                 eff_mean, eff_variance, x_mask, beta_param,
                 tox_thre, eff_thre, tox_weight, eff_weight,
@@ -538,14 +570,22 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                 # tox_acqui_funcs[subgroup_idx, :] = y_tox_sample.mean[subgroup_idx, :]
                 # eff_acqui_funcs[subgroup_idx, :] = y_eff_sample.mean[subgroup_idx, :]
 
-                print("Select based on eff confidence interval.")
-                selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
-                eff_acqui_funcs[subgroup_idx, :] = select_dose_confidence(num_doses, max_doses[subgroup_idx],
-                                                                          y_tox_posteriors.mean[subgroup_idx, :],
-                                                                          y_tox_posteriors.upper[subgroup_idx, :],
-                                                                          y_eff_posteriors.upper[subgroup_idx, :],
-                                                                          y_eff_posteriors.lower[subgroup_idx, :],
-                                                                          x_mask, current_beta_param)
+                # print("Select based on eff confidence interval.")
+                # selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
+                # eff_acqui_funcs[subgroup_idx, :] = select_dose_confidence(num_doses, max_doses[subgroup_idx],
+                #                                                           y_tox_posteriors.mean[subgroup_idx, :],
+                #                                                           y_tox_posteriors.upper[subgroup_idx, :],
+                #                                                           y_eff_posteriors.upper[subgroup_idx, :],
+                #                                                           y_eff_posteriors.lower[subgroup_idx, :],
+                #                                                           x_mask, current_beta_param)
+                
+                print("Select highest possible safe dose.")
+                selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :] = \
+                    select_dose_increasing(num_doses, max_doses[subgroup_idx],
+                                           y_tox_posteriors.mean[subgroup_idx, :],
+                                           y_tox_posteriors.upper[subgroup_idx, :],
+                                           x_mask, current_beta_param)
+                eff_acqui_funcs[subgroup_idx, :] = 0.
 
             else:
                 selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
@@ -702,7 +742,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, markevery, results_dir)
 
 
-filepath = "results/113_example"
+filepath = "results/114_example"
 beta_param = 0.2
 sampling_timesteps = 15
 increase_beta_param = False
