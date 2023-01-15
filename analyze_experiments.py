@@ -4,58 +4,54 @@ import torch
 
 from data_generation import DoseFindingScenarios, TrialPopulationScenarios
 from dose_finding_experiments import DoseFindingExperiment
+from plots import plot_gp_trials
 
 
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 experiment = DoseFindingExperiment(dose_scenario, patient_scenario)
 
-filepath = "results/24"
-num_trials = 78
-metrics_frames = []
-dose_rec_frames = []
-model_params_frames = []
+x_true = dose_scenario.dose_labels.astype(np.float32)
+x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
+x_test = np.unique(x_test)
+np.sort(x_test)
+x_test = torch.tensor(x_test, dtype=torch.float32)
+x_mask = np.isin(x_test, x_true)
+markevery = np.arange(len(x_test))[x_mask].tolist()
+
+filepath = "results/exp2"
+num_trials = 100
+
+dose_counts_list = []
+metrics_list = []
+grouped_metrics_list = []
+final_dose_recs_list = []
+
+tox_means = np.empty((num_trials, patient_scenario.num_subgroups, x_test.shape[0]))
+eff_means = np.empty((num_trials, patient_scenario.num_subgroups, x_test.shape[0]))
+util_vals = np.empty((num_trials, patient_scenario.num_subgroups, x_test.shape[0]))
 
 for trial in range(num_trials):
-    metrics_frame = pd.read_csv(f"{filepath}/trial{trial}/timestep_metrics.csv")
-    metrics_frames.append(metrics_frame)
+    trial_path = f"{filepath}/trial{trial}"
+    dose_counts = pd.read_csv(f"{trial_path}/dose_counts.csv")
+    metrics = pd.read_csv(f"{trial_path}/timestep_metrics.csv")
+    grouped_metrics = pd.read_csv(f"{trial_path}/overall_metrics.csv")
+    final_dose_rec = pd.read_csv(f"{trial_path}/final_dose_rec.csv")
 
-    dose_rec_frame = pd.read_csv(f"{filepath}/trial{trial}/final_dose_rec.csv")
-    dose_rec_frames.append(dose_rec_frame)
+    dose_counts_list.append(dose_counts)
+    metrics_list.append(metrics)
+    grouped_metrics_list.append(grouped_metrics)
+    final_dose_recs_list.append(final_dose_rec)
 
-    # model_params_frame = pd.read_csv(f"{filepath}/trial{trial}/final_model_params.csv")
-    # model_params_frames.append(model_params_frame)
+    tox_means[trial, :, :] = np.load(f"{trial_path}/tox_means.npy")
+    eff_means[trial, :, :] = np.load(f"{trial_path}/eff_means.npy")
+    util_vals[trial, :, :] = np.load(f"{trial_path}/util_vals.npy")
+    
+all_dose_recs = pd.concat(final_dose_recs_list)
+all_dose_recs_grouped = all_dose_recs.groupby('subgroup_idx')['final_dose_rec'].value_counts()
+all_dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
 
-frame = pd.concat(metrics_frames)
-grouped_frame = frame.groupby(frame.index)
-mean_frame = grouped_frame.mean()
-var_frame = grouped_frame.var()
-mean_frame = mean_frame[['toxicity', 'efficacy', 'utility', 'dose_error', 'final_dose_error']]
-var_frame = var_frame[['toxicity', 'efficacy', 'utility', 'dose_error', 'final_dose_error']]
-print(mean_frame)
-print(var_frame)
-mean_frame.to_csv(f"{filepath}/final_metric_means.csv")
-var_frame.to_csv(f"{filepath}/final_metric_var.csv")
-
-dose_recs = pd.concat(dose_rec_frames)
-dose_recs_grouped = dose_recs.groupby('subgroup_idx').value_counts().reset_index()
-dose_recs_grouped = dose_recs_grouped.rename(columns={0: 'count'})
-print(dose_recs_grouped)
-dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
-
-# model_params_trials = pd.concat(model_params_frames)
-# model_params_grouped = model_params_trials.groupby(model_params_trials.index).mean()
-# print(model_params_grouped)
-# model_params_grouped.to_csv(f"{filepath}/trials_model_params.csv")
-
-
-true_x = dose_scenario.dose_labels.astype(np.float32)
-test_x = np.concatenate([np.arange(true_x.min(), true_x.max(), 0.05, dtype=np.float32), true_x])
-test_x = np.unique(test_x)
-np.sort(test_x)
-test_x = torch.tensor(test_x, dtype=torch.float32)
-
-tox_means = np.load(f"{filepath}/trial{num_trials}/tox_means.npy")
-eff_means = np.load(f"{filepath}/trial{num_trials}/eff_means.npy")
-
-experiment.plot_subgroup_trial_gp_results(tox_means, eff_means, test_x, patient_scenario.num_subgroups, filepath)
+plot_gp_trials(tox_means, eff_means, util_vals, x_test,
+                dose_scenario.dose_labels, dose_scenario.toxicity_probs,
+                dose_scenario.efficacy_probs,
+                patient_scenario.num_subgroups, markevery, filepath)

@@ -240,6 +240,7 @@ def select_dose_confidence(num_doses, max_dose, tox_mean, tox_upper,
 
 def select_dose_increasing(num_doses, max_dose, tox_mean, tox_upper,
                            x_mask, beta_param):
+    beta_param = 0
     ## Select ideal dose for subgroup
     # Available doses are current max dose idx + 1
     available_dose_indices = np.arange(max_dose + 2)
@@ -742,7 +743,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, markevery, results_dir)
 
 
-filepath = "results/114_example"
+filepath = "results/exp3"
 beta_param = 0.2
 sampling_timesteps = 15
 increase_beta_param = False
@@ -758,13 +759,13 @@ final_beta_param = 0.
 dose_scenario = DoseFindingScenarios.subgroups_example_1()
 patient_scenario = TrialPopulationScenarios.equal_population(2)
 
-online_dose_finding(filepath, dose_scenario, patient_scenario,
-                    num_samples, num_latents, beta_param, learning_rate,
-                    final_beta_param, sampling_timesteps, increase_beta_param,
-                    use_utility, use_gpu)
+# online_dose_finding(filepath, dose_scenario, patient_scenario,
+#                     num_samples, num_latents, beta_param, learning_rate,
+#                     final_beta_param, sampling_timesteps, increase_beta_param,
+#                     use_utility, use_gpu)
 
-# online_dose_finding_trials(filepath, num_trials, dose_scenario,
-#                            patient_scenario, num_samples, num_latents,
-#                            beta_param, learning_rate, final_beta_param,
-#                            sampling_timesteps, increase_beta_param, use_utility,
-#                            use_gpu)
+online_dose_finding_trials(filepath, num_trials, dose_scenario,
+                           patient_scenario, num_samples, num_latents,
+                           beta_param, learning_rate, final_beta_param,
+                           sampling_timesteps, increase_beta_param, use_utility,
+                           use_gpu)
