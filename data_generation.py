@@ -66,11 +66,16 @@ class DoseFindingScenario:
 
     def plot_true_subgroup_curves(self):
         sns.set()
+        _, axs = plt.subplots(1, 2, figsize=(8, 4))
+        axs[0].set_title(f"Toxicity")
+        axs[1].set_title(f"Efficacy")
         for idx in range(self.num_subgroups):
-            plt.plot(self.dose_labels, self.toxicity_probs[idx, :], marker='o', label=f"Toxicity {idx}")
-            plt.plot(self.dose_labels, self.efficacy_probs[idx, :], marker='o', label=f"Efficacy {idx}")
-        plt.xlim(0, self.dose_range[1])
-        plt.ylim(0, 1.1)
+            axs[0].plot(self.dose_labels, self.toxicity_probs[idx, :], marker='o', label=f"Toxicity {idx}")
+            axs[1].plot(self.dose_labels, self.efficacy_probs[idx, :], marker='o', label=f"Efficacy {idx}")
+        axs[0].plot(self.dose_labels, np.repeat(self.toxicity_threshold, len(self.dose_labels)), 'm', label='Threshold')
+        axs[1].plot(self.dose_labels, np.repeat(self.efficacy_threshold, len(self.dose_labels)), 'm', label='Threshold')
+        axs[0].set_ylim([0, 1.1])
+        axs[1].set_ylim([0, 1.1])
         plt.xlabel('Dose Labels')
         plt.ylabel('Response')
         plt.legend()
@@ -259,6 +264,420 @@ class DoseFindingScenarios:
                                    dose_range=dose_range, p_param=p_param,
                                    tox_weight=1, eff_weight=2)
     
+    @staticmethod
+    def paper_example_1():
+        '''
+        Toxicity and efficacy both increasing. Same for both subgroups.
+        '''
+        tox_model, tox_model2, eff_model, p_param, dose_range = None, None, None, None, None
+        eff_thre = 0.15
+        tox_thre = 0.35
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.05, 0.1, 0.2,  0.4,  0.6],
+                                   [0.05, 0.1, 0.2,  0.4,  0.6]])
+        efficacy_probs = np.array([[0.1, 0.25,  0.35, 0.5, 0.65],
+                                   [0.1, 0.25,  0.35, 0.5, 0.65]])
+        
+        optimal_doses = np.array([2, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_2():
+        '''
+        Toxicity increasing, efficacy plateauing. Same for both subgroups.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.15
+        tox_thre = 0.5
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.1, 0.2, 0.25,  0.4,  0.55],
+                                   [0.1, 0.2, 0.25,  0.4,  0.55]])
+        efficacy_probs = np.array([[0.2, 0.3,  0.6, 0.62, 0.65],
+                                   [0.2, 0.3,  0.6, 0.62, 0.65]])
+
+        optimal_doses = np.array([2, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_3():
+        '''
+        Toxicity increasing, eff increasing. Vertical shift on efficacy.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.25
+        tox_thre = 0.35
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.2, 0.3, 0.45,  0.55,  0.6],
+                                   [0.2, 0.3, 0.45,  0.55,  0.6]])
+        efficacy_probs = np.array([[0.3, 0.4,  0.5, 0.65, 0.75],
+                                   [0.01, 0.1,  0.25, 0.4, 0.5]])
+        
+        optimal_doses = np.array([2, 5])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+    
+    @staticmethod
+    def paper_example_4():
+        '''
+        Toxicity increasing, eff plateau. Vertical shift on efficacy.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.6
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.2, 0.3, 0.45,  0.6,  0.75],
+                                   [0.2, 0.3, 0.45,  0.6,  0.75]])
+        efficacy_probs = np.array([[0.3, 0.4,  0.6, 0.62, 0.64],
+                                   [0.01, 0.15,  0.35, 0.37, 0.39]])
+        
+        optimal_doses = np.array([2, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_5():
+        '''
+        Toxicity increasing, eff unimodal. Vertical shift on efficacy.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.6
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.1, 0.2, 0.35,  0.5,  0.6],
+                                   [0.1, 0.2, 0.35,  0.5,  0.6]])
+        efficacy_probs = np.array([[0.01, 0.2,  0.3, 0.5, 0.3],
+                                   [0.2, 0.3,  0.5, 0.3, 0.01]])
+        
+        optimal_doses = np.array([3, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+    @staticmethod
+    def paper_example_6():
+        '''
+        Toxicity increasing, eff increasing. Horizontal shift on efficacy.
+        This scenario also tests the optimal dose being the final dose
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.2,  0.27],
+                                   [0.05, 0.1, 0.15,  0.2,  0.27]])
+        efficacy_probs = np.array([[0.1, 0.2,  0.45, 0.6, 0.75],
+                                   [0.1, 0.15,  0.2, 0.4, 0.55]])
+        
+        optimal_doses = np.array([4, 4])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_7():
+        '''
+        Toxicity increasing, eff plateau. Horizontal shift on efficacy.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.6
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.1, 0.2, 0.35,  0.5,  0.65],
+                                   [0.1, 0.2, 0.35,  0.5,  0.65]])
+        efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.62, 0.64],
+                                   [0.4, 0.6,  0.62, 0.64, 0.66]])
+        
+        optimal_doses = np.array([3, 3])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+    
+    @staticmethod
+    def paper_example_8():
+        '''
+        Toxicity increasing, eff increasing. Vertical shift on toxicity.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.3
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.05, 0.2, 0.35,  0.45,  0.6],
+                                   [0.25, 0.4, 0.55,  0.65,  0.8]])
+        efficacy_probs = np.array([[0.1, 0.2,  0.3, 0.45, 0.6],
+                                   [0.1, 0.2,  0.3, 0.45, 0.6]])
+        
+        optimal_doses = np.array([1, 0])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_9():
+        '''
+        Toxicity increasing, eff plateau. Vertical shift on toxicity.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.15
+        tox_thre = 0.6
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.2, 0.3, 0.4,  0.5,  0.65],
+                                   [0.1, 0.2, 0.3, 0.4, 0.55]])
+        efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.63, 0.65],
+                                   [0.2, 0.4,  0.6, 0.63, 0.65]])
+        
+        optimal_doses = np.array([2, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_10():
+        '''
+        Toxicity increasing, eff increasing. Horizontal shift on toxicity.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.35
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.05, 0.2, 0.45,  0.55,  0.8],
+                                   [0.05, 0.1, 0.2,  0.45,  0.6]])
+        efficacy_probs = np.array([[0.2, 0.3,  0.4, 0.55, 0.7],
+                                   [0.2, 0.3,  0.4, 0.55, 0.7]])
+        
+        optimal_doses = np.array([1, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_11():
+        '''
+        Toxicity increasing, eff plateau. Horizontal shift on toxicity.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.1, 0.25, 0.5,  0.7,  0.85],
+                                   [0.1, 0.15, 0.25, 0.4, 0.6]])
+        efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.63, 0.65],
+                                   [0.2, 0.4,  0.6, 0.63, 0.65]])
+        
+        optimal_doses = np.array([1, 2])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+
+    @staticmethod
+    def paper_example_12():
+        '''
+        Toxicity increasing, eff unimodal. Vertical shift on toxicity (leading to no dose).
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.3
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.05, 0.15,  0.2,  0.3],
+                                   [0.2, 0.25, 0.45, 0.6, 0.8]])
+        efficacy_probs = np.array([[0.1, 0.15,  0.2, 0.45, 0.2],
+                                   [0.1, 0.15,  0.2, 0.45, 0.2]])
+        
+        optimal_doses = np.array([3, 5])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_13():
+        '''
+        Toxicity increasing, eff increasing. Everything shifted.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.05, 0.15,  0.3,  0.7],
+                                   [0.2, 0.3, 0.45, 0.55, 0.75]])
+        efficacy_probs = np.array([[0.3, 0.35, 0.4, 0.45, 0.6],
+                                   [0.15, 0.3, 0.4, 0.5, 0.7]])
+        
+        optimal_doses = np.array([3, 1])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+
+    @staticmethod
+    def paper_example_14():
+        '''
+        Toxicity increasing, eff plateau. Everything shifted.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.05, 0.15,  0.3,  0.7],
+                                   [0.2, 0.3, 0.45, 0.55, 0.75]])
+        efficacy_probs = np.array([[0.01, 0.15, 0.4, 0.42, 0.45],
+                                   [0.15, 0.35, 0.5, 0.52, 0.55]])
+        
+        optimal_doses = np.array([2, 1])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_15():
+        '''
+        Toxicity increasing, eff unimodal. Everything shifted.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.4
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.05, 0.15,  0.3,  0.7],
+                                   [0.2, 0.3, 0.45, 0.55, 0.75]])
+        efficacy_probs = np.array([[0.01, 0.25, 0.65, 0.4, 0.3],
+                                   [0.15, 0.55, 0.4, 0.3, 0.15]])
+        
+        optimal_doses = np.array([2, 1])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+    @staticmethod
+    def paper_example_16():
+        '''
+        Toxicity too high for all doses. 
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.3
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.45, 0.55, 0.65,  0.7,  0.75],
+                                   [0.5, 0.55, 0.6, 0.65, 0.7]])
+        efficacy_probs = np.array([[0.1, 0.2, 0.3, 0.35, 0.4],
+                                   [0.2, 0.35, 0.5, 0.55, 0.65]])
+        
+        optimal_doses = np.array([5, 5])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_17():
+        '''
+        Efficacy too low for all doses.
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.3
+        tox_thre = 0.3
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.05, 0.1,  0.2,  0.3],
+                                   [0.05, 0.1, 0.2, 0.3, 0.4]])
+        efficacy_probs = np.array([[0.01, 0.05, 0.07, 0.1, 0.15],
+                                   [0.01, 0.01, 0.05, 0.08, 0.1]])
+        
+        optimal_doses = np.array([5, 5])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
+    @staticmethod
+    def paper_example_18():
+        '''
+        Efficacy entirely flat
+        '''
+        tox_model, tox_model2, eff_model, p_param = None, None, None, None
+        dose_range = (0.05, 20.)
+        eff_thre = 0.2
+        tox_thre = 0.45
+
+        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        toxicity_probs = np.array([[0.01, 0.1, 0.2,  0.35,  0.45],
+                                   [0.1, 0.25, 0.35, 0.45, 0.55]])
+        efficacy_probs = np.array([[0.4, 0.4, 0.4, 0.4, 0.4],
+                                   [0.45, 0.45, 0.45, 0.45, 0.45]])
+        
+        optimal_doses = np.array([0, 0])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
+                                   dose_range=dose_range, p_param=p_param,
+                                   tox_weight=1, eff_weight=2)
+
     @staticmethod
     def sigmoidal_model_example():
         toxicity_probs = np.array([0.1, 0.2, 0.4, 0.7, 0.9])
@@ -711,6 +1130,5 @@ class TrialPopulationScenarios:
 
 
 
-# scenario = DoseFindingScenarios.oquigley_subgroups_example_1()
-# print(f"True toxicities {[scenario.get_toxicity_prob(label, 1) for label in range(scenario.num_doses)]}")
-# scenario.plot_subgroup_curves()
+# scenario = DoseFindingScenarios.paper_example_1()
+# scenario.plot_true_subgroup_curves()

@@ -237,10 +237,48 @@ def select_dose_confidence(num_doses, max_dose, tox_mean, tox_upper,
     return selected_dose, tox_ucb, eff_intervals
 
 
-def select_dose_increasing(num_doses, max_dose, tox_mean, tox_upper,
+def select_dose_3(num_doses, tox_thre, tox_outcomes, max_dose, tox_mean, tox_upper,
+                  x_mask, beta_param):
+    # Expand to next dose unless there have been more than 1 toxic events
+    if len(tox_outcomes) > 0:
+        if tox_outcomes.sum() > 1:
+            selected_dose = max_dose
+        else:
+            selected_dose = max_dose + 1
+    else:
+        selected_dose = max_dose
+    
+    # If at max dose, select highest safe dose
+    tox_ucb = 0.
+    if selected_dose >= num_doses:
+        print("At max")
+        # Find UCB for toxicity posteriors to determine safe set
+        tox_conf_interval = tox_upper - tox_mean
+        tox_ucb = tox_mean + (beta_param * tox_conf_interval)
+
+        safe_doses_mask = tox_ucb[x_mask] <= tox_thre 
+        gt_threshold = np.where(tox_ucb[x_mask] > tox_thre )[0]
+
+        if gt_threshold.size:
+            first_idx_above_threshold = gt_threshold[0]
+            safe_doses_mask[first_idx_above_threshold:] = False
+        print(f"Safe doses: {safe_doses_mask}")
+
+        # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+        if safe_doses_mask.sum() == 0:
+            selected_dose = 0
+        else:
+            ## Select largest safe dose
+            selected_dose = np.where(safe_doses_mask == True)[0][-1]
+
+    print(f"Tox outcomes: {tox_outcomes}")
+    print(f"Max dose: {max_dose}")
+    print(f"Selected dose: {selected_dose}")
+    return selected_dose, tox_ucb
+
+def select_dose_increasing(num_doses, tox_thre,
+                           max_dose, tox_mean, tox_upper,
                            x_mask, beta_param):
-    beta_param = 0
-    ## Select ideal dose for subgroup
     # Available doses are current max dose idx + 1
     available_dose_indices = np.arange(max_dose + 2)
     available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
@@ -250,8 +288,8 @@ def select_dose_increasing(num_doses, max_dose, tox_mean, tox_upper,
     tox_conf_interval = tox_upper - tox_mean
     tox_ucb = tox_mean + (beta_param * tox_conf_interval)
 
-    safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
-    gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+    safe_doses_mask = tox_ucb[x_mask] <= tox_thre
+    gt_threshold = np.where(tox_ucb[x_mask] > tox_thre)[0]
 
     if gt_threshold.size:
         first_idx_above_threshold = gt_threshold[0]
@@ -284,8 +322,8 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
     tox_conf_interval = tox_upper - tox_mean
     tox_ucb = tox_mean + (beta_param * tox_conf_interval)
 
-    safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
-    gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+    safe_doses_mask = tox_ucb[x_mask] <= tox_thre
+    gt_threshold = np.where(tox_ucb[x_mask] > tox_thre)[0]
 
     if gt_threshold.size:
         first_idx_above_threshold = gt_threshold[0]
@@ -559,6 +597,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         tox_acqui_funcs = np.empty((num_subgroups, len(np_x_test)))
         eff_acqui_funcs = np.empty((num_subgroups, len(np_x_test)))
         util_func = np.empty((num_subgroups, len(np_x_test)))
+        cohort_patients = patients[timestep: timestep + cohort_size]
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
             if timestep <= sampling_timesteps:
@@ -578,14 +617,23 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                 #                                                           y_eff_posteriors.upper[subgroup_idx, :],
                 #                                                           y_eff_posteriors.lower[subgroup_idx, :],
                 #                                                           x_mask, current_beta_param)
-                
+
+
                 print("Select highest possible safe dose.")
+                cohort_patients_mask = cohort_patients == subgroup_idx
                 selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :] = \
-                    select_dose_increasing(num_doses, max_doses[subgroup_idx],
-                                           y_tox_posteriors.mean[subgroup_idx, :],
-                                           y_tox_posteriors.upper[subgroup_idx, :],
-                                           x_mask, current_beta_param)
+                    select_dose_3(num_doses, dose_scenario.toxicity_threshold, np.array(tox_outcomes[timestep - cohort_size: timestep])[cohort_patients_mask],
+                                  max_doses[subgroup_idx], y_tox_posteriors.mean[subgroup_idx, :],
+                                  y_tox_posteriors.upper[subgroup_idx, :], x_mask, current_beta_param)
                 eff_acqui_funcs[subgroup_idx, :] = 0.
+
+                # selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :] = \
+                #     select_dose_increasing(num_doses, dose_scenario.toxicity_threshold,
+                #                            max_doses[subgroup_idx],
+                #                            y_tox_posteriors.mean[subgroup_idx, :],
+                #                            y_tox_posteriors.upper[subgroup_idx, :],
+                #                            x_mask, current_beta_param)
+                # eff_acqui_funcs[subgroup_idx, :] = 0.
 
             else:
                 selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
@@ -610,7 +658,6 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         print(f"Selected dose by subgroup: {selected_dose_by_subgroup}")
 
         # Assign dose to each patient in cohort, update outcomes.
-        cohort_patients = patients[timestep: timestep + cohort_size]
         for subgroup_idx in cohort_patients:
             selected_dose = selected_dose_by_subgroup[subgroup_idx]
             selected_dose_val = dose_labels[selected_dose]
@@ -742,29 +789,66 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                    patient_scenario.num_subgroups, markevery, results_dir)
 
 
-filepath = "results/exp3"
-beta_param = 0.2
-sampling_timesteps = 15
-increase_beta_param = False
-use_utility = False
-use_gpu = False
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--filepath", type=str, help="File path name")
+    parser.add_argument("--scenario", type=int, help="Dose scenario")
+    parser.add_argument("--beta_param", type=float, help="Beta param for toxicity confidence interval.")
+    parser.add_argument("--sampling_timesteps", type=int, help="Number of timesteps to run burn-in procedure.")
+    parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
+    args = parser.parse_args()
 
-num_trials = 100
-num_samples = 51
-num_latents = 2
-learning_rate = 0.01
-final_beta_param = 0.
+    scenarios = {
+        1: DoseFindingScenarios.paper_example_1(),
+        2: DoseFindingScenarios.paper_example_2(),
+        3: DoseFindingScenarios.paper_example_3(),
+        4: DoseFindingScenarios.paper_example_4(),
+        5: DoseFindingScenarios.paper_example_5(),
+        6: DoseFindingScenarios.paper_example_6(),
+        7: DoseFindingScenarios.paper_example_7(),
+        8: DoseFindingScenarios.paper_example_8(),
+        9: DoseFindingScenarios.paper_example_9(),
+        10: DoseFindingScenarios.paper_example_10(),
+        11: DoseFindingScenarios.paper_example_11(),
+        12: DoseFindingScenarios.paper_example_12(),
+        13: DoseFindingScenarios.paper_example_13(),
+        14: DoseFindingScenarios.paper_example_14(),
+        15: DoseFindingScenarios.paper_example_15(),
+        16: DoseFindingScenarios.paper_example_16(),
+        17: DoseFindingScenarios.paper_example_17(),
+        18: DoseFindingScenarios.paper_example_18()
+    }
 
-dose_scenario = DoseFindingScenarios.subgroups_example_1()
-patient_scenario = TrialPopulationScenarios.equal_population(2)
+    filepath = args.filepath
+    scenario = args.scenario
+    beta_param = args.beta_param
+    sampling_timesteps = args.sampling_timesteps
+    run_one = args.run_one
+    return filepath, scenarios[scenario], beta_param, sampling_timesteps, run_one
 
-# online_dose_finding(filepath, dose_scenario, patient_scenario,
-#                     num_samples, num_latents, beta_param, learning_rate,
-#                     final_beta_param, sampling_timesteps, increase_beta_param,
-#                     use_utility, use_gpu)
 
-online_dose_finding_trials(filepath, num_trials, dose_scenario,
-                           patient_scenario, num_samples, num_latents,
-                           beta_param, learning_rate, final_beta_param,
-                           sampling_timesteps, increase_beta_param, use_utility,
-                           use_gpu)
+if __name__ == "__main__":
+    filepath, dose_scenario, beta_param, sampling_timesteps, run_one = parse_args()
+    increase_beta_param = False
+    use_utility = False
+    use_gpu = False
+    num_trials = 100
+    num_samples = 51
+    num_latents = 2
+    learning_rate = 0.01
+    final_beta_param = 0.
+
+    # dose_scenario = DoseFindingScenarios.paper_example_1()
+    patient_scenario = TrialPopulationScenarios.equal_population(2)
+
+    if run_one:
+        online_dose_finding(filepath, dose_scenario, patient_scenario,
+                            num_samples, num_latents, beta_param, learning_rate,
+                            final_beta_param, sampling_timesteps, increase_beta_param,
+                            use_utility, use_gpu)
+    else:
+        online_dose_finding_trials(filepath, num_trials, dose_scenario,
+                                patient_scenario, num_samples, num_latents,
+                                beta_param, learning_rate, final_beta_param,
+                                sampling_timesteps, increase_beta_param, use_utility,
+                                use_gpu)

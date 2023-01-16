@@ -324,7 +324,7 @@ def main2():
     num_patients = 51
     learning_rate = 0.01
 
-    scenario = DoseFindingScenarios.subgroups_example_1()
+    scenario = DoseFindingScenarios.paper_example_1()
     num_doses = scenario.num_doses
     num_subgroups = scenario.num_subgroups
     tox_thre = scenario.toxicity_threshold
