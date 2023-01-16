@@ -1,4 +1,4 @@
-import math
+import os
 import numpy as np
 from scipy.stats import beta 
 import pandas as pd
@@ -44,13 +44,15 @@ class ExperimentRunner:
         return patients
 
 
-    def print_results(self, out_metrics):
+    def print_results(self, out_metrics, filepath):
         num_subgroups = out_metrics.p_hat.shape[0]
         num_patients = out_metrics.total_cum_eff.shape[0]
         efficacy = out_metrics.total_cum_eff[-1, :].mean()
         toxicity = out_metrics.total_cum_tox[-1, :].mean()
 
         metrics_frame = pd.DataFrame({'subgroup': list(np.arange(num_subgroups)) + ['overall'],
+                                      'safety violations': list(out_metrics.safety_violations.mean(axis=1)) + [out_metrics.safety_violations.mean()],
+                                      'utility': list(out_metrics.utility_by_person.mean(axis=1)) + [out_metrics.utility_by_person.mean()],
                                       'dose error by person': list(out_metrics.regret_by_person.mean(axis=1)) + [out_metrics.regret[:, -1, :].sum(axis=0).mean() / num_patients], # incorrect dose assignments
                                       'efficacy regret': list(out_metrics.eff_regret[:, -1, :].mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean()],
                                       'efficacy regret by person': list(out_metrics.eff_regret_by_person.mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean() / num_patients],
@@ -60,6 +62,8 @@ class ExperimentRunner:
         print(metrics_frame)
         print(f"a: {out_metrics.a_hat_fin.mean(axis=1)}")
         print(f"b: {out_metrics.b_hat_fin.mean(axis=1)}")
+
+        metrics_frame.to_csv(f"{filepath}/metrics_fram.csv")
 
     def make_plots(self, dose_labels, out_metrics):
         plt.subplot(334)
@@ -205,7 +209,7 @@ class ExperimentRunner:
 
         self.make_plots(dose_labels, exp_metrics)
     
-    def run_one_param(self, model_type, a0):
+    def run_one_param(self, model_type, a0, filepath):
         dose_skeleton = np.mean(self.p_true, axis=0)
         dose_skeleton_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
 
@@ -231,7 +235,7 @@ class ExperimentRunner:
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
-        self.print_results(exp_metrics)
+        self.print_results(exp_metrics, filepath)
 
         def _plot_subgroup_trials(ax, rep_means, test_x, true_x, true_y):
             sns.set()
@@ -257,7 +261,7 @@ class ExperimentRunner:
                                   dose_labels[subgroup_idx], self.q_true[subgroup_idx])
 
         fig.tight_layout()
-        plt.show()
+        plt.savefig(f"{filepath}/final_plot.png", dpi=300)
 
 
         # plt.figure(figsize=(10, 8))
@@ -319,12 +323,11 @@ def main():
     #runner.run_one_param(TanhModel, a0)
     runner.run_one_param(OGTanhModel, a0)
 
-def main2():
-    reps = 100 # num of simulated trials
+def main2(scenario, filepath):
+    reps = 1000 # num of simulated trials
     num_patients = 51
     learning_rate = 0.01
 
-    scenario = DoseFindingScenarios.paper_example_1()
     num_doses = scenario.num_doses
     num_subgroups = scenario.num_subgroups
     tox_thre = scenario.toxicity_threshold
@@ -344,7 +347,36 @@ def main2():
 
     a0 = 1 / np.e
     #runner.run_one_param(TanhModel, a0)
-    runner.run_one_param(OGTanhModel, a0)
+    runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    main2()
+    scenarios = {
+        9: DoseFindingScenarios.paper_example_9(),
+        1: DoseFindingScenarios.paper_example_1(),
+        2: DoseFindingScenarios.paper_example_2(),
+        3: DoseFindingScenarios.paper_example_3(),
+        4: DoseFindingScenarios.paper_example_4(),
+        5: DoseFindingScenarios.paper_example_5(),
+        6: DoseFindingScenarios.paper_example_6(),
+        7: DoseFindingScenarios.paper_example_7(),
+        8: DoseFindingScenarios.paper_example_8(),
+        10: DoseFindingScenarios.paper_example_10(),
+        11: DoseFindingScenarios.paper_example_11(),
+        12: DoseFindingScenarios.paper_example_12(),
+        13: DoseFindingScenarios.paper_example_13(),
+        14: DoseFindingScenarios.paper_example_14(),
+        15: DoseFindingScenarios.paper_example_15(),
+        16: DoseFindingScenarios.paper_example_16(),
+        17: DoseFindingScenarios.paper_example_17(),
+        18: DoseFindingScenarios.paper_example_18()
+    }
+
+    for idx, scenario in scenarios.items():
+        filepath = f"results/c3t_more/scenario{idx}"
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        main2(scenario, filepath)
+
+    # scenario = DoseFindingScenarios.paper_example_9()
+    # filepath = "results/116_example"
+    # main2(scenario, filepath)

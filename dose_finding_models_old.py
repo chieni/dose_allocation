@@ -10,6 +10,14 @@ from helpers import alpha_func, get_ucb
 from metrics import TrialMetrics
 
 
+
+def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
+    tox_term = (tox_means - tox_thre) ** 2
+    eff_term = (eff_means - eff_thre) ** 2
+    tox_term[tox_means > tox_thre] = 0.
+    eff_term[eff_means < eff_thre] = 0.
+    return (tox_weight * tox_term) + (eff_weight * eff_term)
+
 class DoseFindingModel:
     def __init__(self, time_horizon, num_subgroups, num_doses, patients, learning_rate):
         self.time_horizon = time_horizon
@@ -99,7 +107,7 @@ class DoseFindingModel:
                                                 curr_eff_regret, curr_tox_regret)
 
 
-    def finalize_results(self, timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind):
+    def finalize_results(self, timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind, q_true):
         '''
         Originally finalize_results_with_gradient_shared_param
         '''
@@ -134,11 +142,24 @@ class DoseFindingModel:
         if timestep < self.time_horizon:
             self.metrics.q_mse[:, :, timestep:] = np.tile(np.expand_dims(self.metrics.q_mse[:, :, timestep-1], axis=2), (1, 1, self.time_horizon - timestep))  
         
+        selected_tox_probs = np.array([p_true[group_idx, arm_idx] for group_idx, arm_idx in zip(self.patients, self.allocated_doses)])
+        safety_violations = np.array(selected_tox_probs > tox_thre, dtype=np.int32)
+
+        # Calculate utilities
+        selected_eff_probs = np.array([q_true[group_idx, arm_idx] for group_idx, arm_idx in zip(self.patients, self.allocated_doses)])
+        utilities = calculate_utility(selected_tox_probs, selected_eff_probs, tox_thre, eff_thre,
+                                      tox_weight=1, eff_weight=2)
+
         self.metrics.typeI = self.metrics.typeI / self.num_doses
         self.metrics.typeII = self.metrics.typeII / self.num_doses
         self.metrics.p_hat = self.empirical_toxicity_estimate
         self.metrics.q_hat = self.empirical_efficacy_estimate
         self.metrics.pats_count = np.unique(self.patients, return_counts=True)[1]
+        for s in range(self.num_subgroups):
+            self.metrics.safety_violations[s] = safety_violations[self.patients == s].sum() 
+            self.metrics.utility_by_person[s] = utilities[self.patients == s].sum()
+        self.metrics.safety_violations = self.metrics.safety_violations / self.metrics.pats_count
+        self.metrics.utility_by_person = self.metrics.utility_by_person / self.metrics.pats_count
         self.metrics.dose_err_by_person = self.metrics.rec_err / self.metrics.pats_count
         self.metrics.cum_eff_by_person = self.metrics.cum_eff[:, -1] / self.metrics.pats_count
         self.metrics.cum_tox_by_person = self.metrics.cum_tox[:, -1] / self.metrics.pats_count
@@ -624,7 +645,80 @@ class OGTanhModel(TanhModel):
         for s in range(self.num_subgroups):
             self.model_toxicity_estimate[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat[s, -1])
 
-        self.finalize_results(timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind)
+        self.finalize_results(timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind, q_true)
         self.metrics.a_hat_fin = self.current_a_hat[:, -1]
 
         return self.metrics
+
+    # def run_model(self, tox_thre, eff_thre, p_true, q_true, opt_ind, dose_labels):
+    #     timestep = 0
+    #     cohort_size = 3
+
+    #     # Initialize first cohort wiht lowest dose
+    #     for idx, curr_s in enumerate(self.patients[timestep: timestep + cohort_size]):
+    #         t = timestep + idx
+    #         self.allocated_doses[t] = 0
+    #         self.efficacy_at_timestep[t] = np.random.rand() <= q_true[curr_s, self.allocated_doses[t]] # Sample efficacy
+    #         self.toxicity_at_timestep[t] = np.random.rand() <= p_true[curr_s, self.allocated_doses[t]] # Sample toxicity
+
+    #         self.empirical_efficacy_estimate[curr_s, self.allocated_doses[t]] = self.efficacy_at_timestep[t]
+    #         self.empirical_toxicity_estimate[curr_s, self.allocated_doses[t]] = self.toxicity_at_timestep[t]
+
+    #     timestep += cohort_size
+
+    #     while timestep < self.time_horizon:
+    #         for s in range(self.num_subgroups):
+    #             I_est = np.argmax(self.n_choose[s, :])
+    #             self.current_a_hat[s, timestep] = self.ak_hat[s, I_est]
+    #         self.metrics.q_mse[:, :, timestep] = np.abs(q_true - self.empirical_efficacy_estimate)**2
+    #         selected_dose_by_subgroup = np.empty(self.num_subgroups, dtype=np.int32)
+    #         cohort_patients = self.patients[timestep: timestep + cohort_size]
+
+    #         for s in range(self.num_subgroups):
+    #             # Calculate alpha
+    #             self.alpha[s] = alpha_func(dose_labels[s, :], self.num_doses, self.delta[s], np.sum(self.n_choose[s, :])) 
+    #             # Use toxicity model estimates
+    #             self.available_doses[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat[s, timestep]) <= tox_thre
+    #             # Use empirical toxicity estimates
+    #             #self.available_doses[s, :] = self.empirical_toxicity_estimate[s, :] <= tox_thre
+    #             #self.available_doses[s, :] = p_true[s, :] <= tox_thre
+    #             selected_dose_by_subgroup[s] = np.argmax(self.efficacy_ucb[s, :] * self.available_doses[s, :])
+            
+    #         for idx, curr_s in enumerate(cohort_patients):
+    #             self.subgroup_count[curr_s] += 1
+    #             self.allocated_doses[timestep + idx] = selected_dose_by_subgroup[curr_s]
+    #             self.efficacy_at_timestep[timestep + idx] = np.random.rand() <= q_true[curr_s, self.allocated_doses[timestep + idx]]
+    #             self.toxicity_at_timestep[timestep + idx] = np.random.rand() <= p_true[curr_s, self.allocated_doses[timestep + idx]]
+
+    #             self.empirical_efficacy_estimate[curr_s, self.allocated_doses[timestep + idx]] = self.update_empirical_efficacy_estimate(curr_s, timestep + idx)
+    #             self.empirical_toxicity_estimate[curr_s, self.allocated_doses[timestep + idx]] = self.update_empirical_toxicity_estimate(curr_s, timestep + idx)
+
+    #             self.n_choose[curr_s, self.allocated_doses[timestep + idx]] += 1
+    #             self.n_tox[curr_s, self.allocated_doses[timestep + idx]] += self.toxicity_at_timestep[timestep + idx]
+    #             self.update_efficacy_ucb(curr_s)  
+    #             self.update_metrics(timestep + idx, curr_s, dose_labels, tox_thre, eff_thre, p_true, q_true, opt_ind)
+            
+    #             new_a = np.log(self.empirical_toxicity_estimate[curr_s, self.allocated_doses[timestep + idx]]) / \
+    #                             np.log((np.tanh(dose_labels[curr_s, self.allocated_doses[timestep + idx]]) + 1.) / 2.)
+    #             if new_a > self.a_max:
+    #                 new_a = self.a_max
+    #             if new_a < 0:
+    #                 new_a = 0.01
+    #             print(new_a)
+    #             self.ak_hat[curr_s, self.allocated_doses[timestep + idx]] = new_a
+    #             print(timestep + idx)
+    #         timestep += cohort_size
+
+    #     for s in range(self.num_subgroups):
+    #         I_est = np.argmax(self.n_choose[s, :])
+    #         self.current_a_hat[s, timestep - 1] = self.ak_hat[s, I_est]
+
+    #     print(f"Final a hat: {self.current_a_hat[:, -1]}")
+    #     for s in range(self.num_subgroups):
+    #         self.model_toxicity_estimate[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat[s, -1])
+
+    #     print(self.model_toxicity_estimate)
+    #     self.finalize_results(timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind, q_true)
+    #     self.metrics.a_hat_fin = self.current_a_hat[:, -1]
+
+    #     return self.metrics

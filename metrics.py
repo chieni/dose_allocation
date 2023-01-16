@@ -31,6 +31,8 @@ class ExperimentMetrics:
         self.cum_tox_by_person = np.zeros((S, reps))
         self.eff_regret_by_person = np.zeros((S, reps))
         self.regret_by_person = np.zeros((S, reps))
+        self.safety_violations = np.zeros((S, reps))
+        self.utility_by_person = np.zeros((S, reps))
 
         self.incorporate_metrics(trial_metrics)
 
@@ -64,6 +66,8 @@ class ExperimentMetrics:
             self.cum_tox_by_person[:, idx] = trial_metric_obj.cum_tox_by_person
             self.eff_regret_by_person[:, idx] = trial_metric_obj.eff_regret_by_person
             self.regret_by_person[:, idx] = trial_metric_obj.regret_by_person
+            self.safety_violations[:, idx] = trial_metric_obj.safety_violations
+            self.utility_by_person[:, idx] = trial_metric_obj.utility_by_person
 
 
 class TrialMetrics:
@@ -81,6 +85,7 @@ class TrialMetrics:
         self.total_tox_regret = np.zeros(T)
         self.tox_regret = np.zeros((S, T))
         self.safety_violations = np.zeros(S)
+        self.utility_by_person = np.zeros(S)
         self.regret = np.zeros((S, T))
 
         self.rec = np.zeros((S, K+1))
