@@ -107,8 +107,7 @@ class DoseExperimentMetrics:
         dose_counts_mean.to_csv(f"{filepath}/all_dose_counts.csv")
 
         dose_recs = pd.concat([df.final_dose_rec for df in metrics_list])
-        dose_recs_grouped = dose_recs.groupby('subgroup_idx').value_counts().reset_index()
-        dose_recs_grouped = dose_recs_grouped.rename(columns={0: 'count'})
+        dose_recs_grouped = dose_recs.groupby('subgroup_idx')['final_dose_rec'].value_counts()
         print(dose_recs_grouped)
         dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
 
