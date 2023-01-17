@@ -66,8 +66,8 @@ class MultitaskClassificationRunner:
         self.likelihood = MultitaskBernoulliLikelihood()
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
-        # lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3]])
-        lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3], [0, 0.3]])
+        lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3]])
+        # lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3], [0, 0.3]])
         if use_gpu:
             self.model = self.model.cuda()
             self.likelihood = self.likelihood.cuda()

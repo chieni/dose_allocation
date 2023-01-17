@@ -237,6 +237,43 @@ def select_dose_confidence(num_doses, max_dose, tox_mean, tox_upper,
     return selected_dose, tox_ucb, eff_intervals
 
 
+def select_dose_expander(num_doses, max_dose, tox_mean, tox_upper,
+                         eff_upper, eff_lower, x_mask, beta_param):
+    ## Select ideal dose for subgroup
+    # Available doses are current max dose idx + 1
+    available_dose_indices = np.arange(max_dose + 2)
+    available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
+    print(f"Available doses: {available_doses_mask}")
+
+    # Find UCB for toxicity posteriors to determine safe set
+    tox_conf_interval = tox_upper - tox_mean
+    tox_ucb = tox_mean + (beta_param * tox_conf_interval)
+
+    safe_doses_mask = tox_ucb[x_mask] <= dose_scenario.toxicity_threshold
+    gt_threshold = np.where(tox_ucb[x_mask] > dose_scenario.toxicity_threshold)[0]
+
+    if gt_threshold.size:
+        first_idx_above_threshold = gt_threshold[0]
+        safe_doses_mask[first_idx_above_threshold:] = False
+    print(f"Safe doses: {safe_doses_mask}")
+
+    dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
+    print(f"Dose set: {safe_doses_mask}")
+
+    ## Select dose with efficacy at widest confidence interval
+    eff_intervals = eff_upper - eff_lower
+    dose_eff_intervals = eff_intervals[x_mask]
+    dose_eff_intervals[~dose_set_mask] = -np.inf
+    max_eff_interval = dose_eff_intervals.max()
+    selected_dose = np.where(dose_eff_intervals == max_eff_interval)[0][-1]
+   
+
+    # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+    if dose_set_mask.sum() == 0:
+        selected_dose = 0
+    return selected_dose, tox_ucb, eff_intervals
+
+
 def select_dose_3(num_doses, tox_thre, tox_outcomes, max_dose, tox_mean, tox_upper,
                   x_mask, beta_param):
     # Expand to next dose unless there have been more than 1 toxic events
@@ -834,7 +871,7 @@ if __name__ == "__main__":
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    num_latents = 3
+    num_latents = 2
     learning_rate = 0.01
     final_beta_param = 0.
 
