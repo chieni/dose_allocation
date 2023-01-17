@@ -834,7 +834,7 @@ if __name__ == "__main__":
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    num_latents = 2
+    num_latents = 3
     learning_rate = 0.01
     final_beta_param = 0.
 
