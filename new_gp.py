@@ -30,15 +30,19 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
 
         super().__init__(variational_strategy)
         self.mean_module = gpytorch.means.ConstantMean(batch_shape=torch.Size([num_latents]))
+        # self.covar_module = gpytorch.kernels.ScaleKernel(
+        #     gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
+        #                                lengthscale_prior=lengthscale_prior) + \
+        #     gpytorch.kernels.LinearKernel(batch_shape=torch.Size([num_latents])),
+        #     batch_shape=torch.Size([num_latents]),
+        #     outputscale_prior=outputscale_prior
+        # )
         self.covar_module = gpytorch.kernels.ScaleKernel(
-            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents]),
-                                       lengthscale_prior=lengthscale_prior) + \
-            gpytorch.kernels.LinearKernel(batch_shape=torch.Size([num_latents]),
-                                          variance_prior=gpytorch.priors.LogNormalPrior(-0.25, 0.5),
-                                          variance_constraint=gpytorch.constraints.Positive()),
+            gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])),
             batch_shape=torch.Size([num_latents]),
             outputscale_prior=outputscale_prior
         )
+
 
 
     def forward(self, x):
@@ -66,7 +70,7 @@ class MultitaskClassificationRunner:
         self.likelihood = MultitaskBernoulliLikelihood()
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
-        lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3]])
+        lmc_coeffs = torch.tensor([[1., 0.7], [0., 0.3]])
         # lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3], [0, 0.3]])
         if use_gpu:
             self.model = self.model.cuda()
@@ -80,14 +84,18 @@ class MultitaskClassificationRunner:
         self.likelihood.train()
 
         model_params = self.model.parameters()
-        self.model.mean_module.constant = 0.05
-        self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
-        self.model.covar_module.base_kernel.kernels[1].variance = 1
-        self.model.covar_module.base_kernel.outputscale = 1
+        self.model.mean_module.constant = 0.
+        self.model.covar_module.base_kernel.lengthscale = 5.
+        # self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
+        # self.model.covar_module.base_kernel.kernels[1].raw_variance = torch.nn.Parameter(torch.tensor([[[-10.]],[[-10.]]]))
+        # self.model.covar_module.base_kernel.kernels[1].offset = 1
+        self.model.covar_module.base_kernel.outputscale = 1.
         self.model.variational_strategy.lmc_coefficients = torch.nn.Parameter(lmc_coeffs)
 
-        model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
-        model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
+        model_params = list(set(model_params) - {self.model.covar_module.base_kernel.raw_lengthscale})
+        # model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
+        # model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
+        # model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_offset})
         model_params = list(set(model_params) - {self.model.covar_module.raw_outputscale})
         model_params = list(set(model_params) - {self.model.variational_strategy.lmc_coefficients})
         model_params = list(set(model_params) - {self.model.mean_module.raw_constant})

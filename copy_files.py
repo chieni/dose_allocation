@@ -1,16 +1,15 @@
 import paramiko
 import os
 import pandas as pd
+import numpy as np
 
 
-
-def copy_files():
+def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
     servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','172.174.234.5',
             '172.174.234.65','172.174.234.185', '172.174.234.240', '172.174.233.180','172.174.235.241',
             '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
             '4.236.170.149','4.236.170.103']
-    folders = ['exp6', 'exp6', 'exp5', 'exp2', 'exp2', 'exp2', 'exp2', 'exp2', 'exp2', 'exp2', 'exp2',
-            'exp2', 'exp2','exp2', 'exp2', 'exp2', 'exp2', 'exp2']
+    folders = [folder_name for idx in range(len(servers))]
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
         # Create an SSH client
@@ -20,7 +19,7 @@ def copy_files():
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         # Connect to the server
-        client.connect(hostname=server_name, username='ic390', password='!')
+        client.connect(hostname=server_name, username='ic390', password='')
 
         # Create an SFTP client
         sftp = client.open_sftp()
@@ -31,11 +30,22 @@ def copy_files():
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            path = f"results/second_pass/scenario{idx+1}"
+            path = f"results/{out_folder_name}/scenario{idx+1}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
             sftp.get(remote_file, local_file)
+        
+        # Download trial files
+        for trial in range(num_trials):
+            local_path = f"results/{out_folder_name}/scenario{idx+1}/trial{trial}"
+            if not os.path.exists(local_path):
+                os.makedirs(local_path)
+            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+            for subgroup_idx in range(num_subgroups):
+                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+                sftp.get(remote_file, local_file)
 
         sftp.close()
         client.close()
@@ -54,4 +64,4 @@ def combine_files():
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-combine_files()
+copy_files('third_pass', 'exp7', 100, 2)
