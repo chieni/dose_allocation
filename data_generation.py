@@ -417,7 +417,7 @@ class DoseFindingScenarios:
         efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.62, 0.64],
                                    [0.4, 0.6,  0.62, 0.64, 0.66]])
         
-        optimal_doses = np.array([3, 3])
+        optimal_doses = np.array([2, 1])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
