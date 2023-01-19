@@ -505,7 +505,7 @@ class DoseFindingScenarios:
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
         toxicity_probs = np.array([[0.1, 0.25, 0.5,  0.7,  0.85],
-                                   [0.1, 0.15, 0.25, 0.4, 0.6]])
+                                   [0.1, 0.15, 0.25, 0.5, 0.7]])
         efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.63, 0.65],
                                    [0.2, 0.4,  0.6, 0.63, 0.65]])
         
