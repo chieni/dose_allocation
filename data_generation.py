@@ -376,7 +376,7 @@ class DoseFindingScenarios:
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
                                    dose_range=dose_range, p_param=p_param,
-                                   tox_weight=1, eff_weight=2)
+                                   tox_weight=1, eff_weight=3)
     @staticmethod
     def paper_example_6():
         '''

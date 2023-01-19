@@ -5,11 +5,13 @@ import matplotlib.pyplot as plt
 
 
 def _plot_gp_helper(ax, x_train, y_train, x_true, y_true, x_test, y_test,
-                    y_test_lower, y_test_upper, threshold, markevery, set_axis):
+                    y_test_lower, y_test_upper, threshold, selected_dose, markevery, x_mask,
+                    set_axis):
     ax.scatter(x_train, y_train, s=40, c='k', alpha=0.1, label='Training Data')
     ax.plot(x_test, y_test, 'b-', markevery=markevery, marker='o',label='GP Predicted')
     ax.plot(x_true, y_true, 'g-', marker='o', label='True')
     ax.plot(x_test, np.repeat(threshold, len(x_test)), 'm', label='Threshold')
+    ax.plot(x_true[selected_dose], y_test[x_mask][selected_dose], 'r', marker='o')
     ax.fill_between(x_test, y_test_lower, y_test_upper, alpha=0.5)
     if set_axis:
         ax.set_ylim([0, 1.1])
@@ -20,7 +22,8 @@ def _plot_gp_helper_utility(ax, x_test, utility, markevery):
     ax.set_ylim([0, 1.1])
 
 def plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices, num_subgroups,
-            x_test, y_tox_dist, y_eff_dist, util_func, markevery, filename, set_axis=False):
+            x_test, y_tox_dist, y_eff_dist, util_func, selected_dose, markevery, x_mask, filename, 
+            set_axis=False):
     sns.set()
     _, axs = plt.subplots(num_subgroups, 3, figsize=(12, 8))
     for subgroup_idx in range(num_subgroups):
@@ -35,12 +38,14 @@ def plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices, 
         _plot_gp_helper(axs[subgroup_idx, 0], group_x_train, group_y_tox_train,
                         dose_scenario.dose_labels, dose_scenario.toxicity_probs[subgroup_idx, :],
                         x_test, y_tox_dist.mean[subgroup_idx, :], y_tox_dist.lower[subgroup_idx, :],
-                        y_tox_dist.upper[subgroup_idx, :], dose_scenario.toxicity_threshold, markevery,
+                        y_tox_dist.upper[subgroup_idx, :], dose_scenario.toxicity_threshold, 
+                        int(selected_dose[subgroup_idx]), markevery, x_mask,
                         set_axis)
         _plot_gp_helper(axs[subgroup_idx, 1], group_x_train, group_y_eff_train,
                         dose_scenario.dose_labels, dose_scenario.efficacy_probs[subgroup_idx, :],
                         x_test, y_eff_dist.mean[subgroup_idx, :], y_eff_dist.lower[subgroup_idx, :],
-                        y_eff_dist.upper[subgroup_idx, :], dose_scenario.efficacy_threshold, markevery,
+                        y_eff_dist.upper[subgroup_idx, :], dose_scenario.efficacy_threshold,
+                        int(selected_dose[subgroup_idx]), markevery, x_mask,
                         set_axis)
         _plot_gp_helper_utility(axs[subgroup_idx, 2], x_test,
                                 util_func[subgroup_idx, :], markevery)

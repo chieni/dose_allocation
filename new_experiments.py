@@ -546,24 +546,22 @@ def offline_dose_finding():
     to a patient subgroup.
     '''
     # Filepath to read offline data from
-    filepath = "results/25_example"
-    save_filepath = "results/44_example"
+    filepath = "results/58_example"
+    save_filepath = "results/59_example"
     if not os.path.exists(save_filepath):
         os.makedirs(save_filepath)
 
     # Hyperparameters
-    num_latents = 2
+    num_latents = 3
     num_epochs = 500
     learning_rate = 0.005
     use_gpu = False
     num_confidence_samples = 1000
 
-    # lengthscale_prior = gpytorch.priors.LogNormalPrior(0.4, 0.5)
-    # outputscale_prior = gpytorch.priors.LogNormalPrior(-0.25, 0.5)
-    lengthscale_prior = None
-    outputscale_prior = None
+    tox_lengthscale = 5.
+    eff_lengthscale = 2.
 
-    dose_scenario = DoseFindingScenarios.subgroups_example_1()
+    dose_scenario = DoseFindingScenarios.paper_example_5()
     patient_scenario = TrialPopulationScenarios.equal_population(2)
     dose_labels = dose_scenario.dose_labels
     num_tasks = patient_scenario.num_subgroups
@@ -576,11 +574,10 @@ def offline_dose_finding():
     eff_responses = frame['eff_outcome'].values
 
     # Construct training data
-    task_indices = torch.LongTensor(subgroup_indices[:18])
-    x_train = torch.tensor(selected_dose_vals[:18], dtype=torch.float32)
-    tox_responses = np.repeat(0, 18)
-    y_tox_train = torch.tensor(tox_responses[:18], dtype=torch.float32)
-    y_eff_train = torch.tensor(eff_responses[:18], dtype=torch.float32)
+    task_indices = torch.LongTensor(subgroup_indices)
+    x_train = torch.tensor(selected_dose_vals, dtype=torch.float32)
+    y_tox_train = torch.tensor(tox_responses, dtype=torch.float32)
+    y_eff_train = torch.tensor(eff_responses, dtype=torch.float32)
 
     # Construct test data
     x_test = np.concatenate([np.arange(dose_labels.min(), dose_labels.max(), 0.05, dtype=np.float32), dose_labels])
@@ -597,8 +594,7 @@ def offline_dose_finding():
 
     # Train model
     tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                               dose_labels, lengthscale_prior=lengthscale_prior,
-                                               outputscale_prior=outputscale_prior)
+                                               dose_labels, tox_lengthscale)
     tox_runner.train(x_train, y_tox_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
     # Print model params
@@ -606,8 +602,7 @@ def offline_dose_finding():
         print(name, param.data)
 
     eff_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                               dose_labels, lengthscale_prior=lengthscale_prior,
-                                               outputscale_prior=outputscale_prior)
+                                               dose_labels, eff_lengthscale)
     eff_runner.train(x_train, y_eff_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
     # Print model params
@@ -619,14 +614,14 @@ def offline_dose_finding():
                                                             x_test, num_confidence_samples, use_gpu)
     y_eff_posteriors, y_eff_latents = get_model_predictions(eff_runner, patient_scenario.num_subgroups,
                                                             x_test, num_confidence_samples, use_gpu)
-    # plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices,
-    #         patient_scenario.num_subgroups, x_test, y_tox_posteriors, y_eff_posteriors,
-    #         f"{save_filepath}/gp_plot")
-
-    # plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices,
-    #         patient_scenario.num_subgroups, x_test, y_tox_latents, y_eff_latents,
-    #         f"{save_filepath}/gp_latents_plot")
-
+    # Select final dose
+    final_selected_doses, final_utilities = select_final_dose(2, 5, 
+                                                              dose_labels, x_test, y_tox_posteriors,
+                                                              y_eff_posteriors,
+                                                              dose_scenario.toxicity_threshold,
+                                                              dose_scenario.efficacy_threshold,
+                                                              dose_scenario.tox_weight,
+                                                              dose_scenario.eff_weight, 0)
     # Calculate utilities
     util_func = np.empty((2, len(np_x_test)))
     for subgroup_idx in range(2):
@@ -636,17 +631,20 @@ def offline_dose_finding():
                                                        dose_scenario.efficacy_threshold,
                                                        dose_scenario.tox_weight, dose_scenario.eff_weight)
 
-    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices[:18], 2,
-            np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, markevery, f"{save_filepath}/final_gp_plot",
+    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices, 2,
+            np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
+            markevery, x_mask, f"{save_filepath}/final_gp_plot",
             set_axis=True)
-    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices[:18], 2,
-            np_x_test, y_tox_latents, y_eff_latents, util_func, markevery, f"{save_filepath}/final_gp_latents_plot")
+    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices, 2,
+            np_x_test, y_tox_latents, y_eff_latents, util_func, final_selected_doses,
+            markevery, x_mask, f"{save_filepath}/final_gp_latents_plot")
     
 
 def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         num_samples, num_latents, beta_param, learning_rate,
+                        tox_lengthscale_init, eff_lengthscale_init,
                         final_beta_param, sampling_timesteps, increase_beta_param,
-                        use_utility, use_gpu):
+                        use_utility, use_lcb_init, use_lcb_exp, use_gpu):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -659,12 +657,6 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     # Hyperparameters
     num_epochs = 300
     num_confidence_samples = 1000
-
-    lengthscale_prior = gpytorch.priors.LogNormalPrior(0.4, 0.5)
-    outputscale_prior = gpytorch.priors.LogNormalPrior(-0.25, 0.5)
-    # lengthscale_prior = None
-    # outputscale_prior = None
-
     cohort_size = 3
 
     dose_labels = dose_scenario.dose_labels
@@ -722,14 +714,12 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
         # Train model
         tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                                   dose_labels, lengthscale_prior=lengthscale_prior,
-                                                   outputscale_prior=outputscale_prior)
+                                                   dose_labels, tox_lengthscale_init)
         tox_runner.train(x_train, y_tox_train, task_indices,
                          num_epochs, learning_rate, use_gpu)
 
         eff_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                                   dose_labels, lengthscale_prior=lengthscale_prior,
-                                                   outputscale_prior=outputscale_prior)
+                                                   dose_labels, eff_lengthscale_init)
         eff_runner.train(x_train, y_eff_train, task_indices,
                          num_epochs, learning_rate, use_gpu)
 
@@ -777,7 +767,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                                                          y_tox_posteriors.upper[subgroup_idx, :],
                                                                                          y_tox_posteriors.lower[subgroup_idx, :],
                                                                                          x_mask, current_beta_param,
-                                                                                         use_lcb=False)
+                                                                                         use_lcb=use_lcb_init)
                 eff_acqui_funcs[subgroup_idx, :] = 0.
 
                 # print("Select highest possible safe dose.")
@@ -808,7 +798,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                             current_beta_param, dose_scenario.toxicity_threshold,
                             dose_scenario.efficacy_threshold,
                             dose_scenario.tox_weight, dose_scenario.eff_weight,
-                            use_utility=use_utility, use_lcb=False)
+                            use_utility=use_utility, use_lcb=use_lcb_exp)
 
                 # selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
                 # eff_acqui_funcs[subgroup_idx, :] = \
@@ -859,7 +849,8 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
         plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
                 patient_scenario.num_subgroups, np_x_test, y_tox_latents, y_eff_latents,
-                util_func, markevery, f"{latent_plots_filepath}/timestep{timestep}")
+                util_func, selected_dose_by_subgroup, markevery, x_mask,
+                f"{latent_plots_filepath}/timestep{timestep}")
         
         timestep += cohort_size
 
@@ -872,14 +863,12 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     # Train model
     tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                               dose_labels, lengthscale_prior=lengthscale_prior,
-                                               outputscale_prior=outputscale_prior)
+                                               dose_labels, tox_lengthscale_init)
     tox_runner.train(x_train, y_tox_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
 
     eff_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                            dose_labels, lengthscale_prior=lengthscale_prior,
-                                            outputscale_prior=outputscale_prior)
+                                            dose_labels, eff_lengthscale_init)
     eff_runner.train(x_train, y_eff_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
     
@@ -914,16 +903,20 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                        dose_scenario.tox_weight, dose_scenario.eff_weight)
 
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
-            np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, markevery, f"{filepath}/final_gp_plot")
+            np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
+            markevery, x_mask, f"{filepath}/final_gp_plot")
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
-            np_x_test, y_tox_latents, y_eff_latents, util_func, markevery, f"{filepath}/final_gp_latents_plot")
+            np_x_test, y_tox_latents, y_eff_latents, util_func, final_selected_doses,
+            markevery, x_mask, f"{filepath}/final_gp_latents_plot")
     
     return experiment_metrics, y_tox_posteriors, y_eff_posteriors, util_func
 
 
 def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
-                               num_samples, num_latents, beta_param, learning_rate, final_beta_param,
-                               sampling_timesteps, increase_beta_param, use_utility, use_gpu):
+                               num_samples, num_latents, beta_param, learning_rate, 
+                               tox_lengthscale_init, eff_lengthscale_init, final_beta_param,
+                               sampling_timesteps, increase_beta_param, use_utility, use_lcb_init,
+                               use_lcb_exp, use_gpu):
     metrics = []
     x_true = dose_scenario.dose_labels.astype(np.float32)
     x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
@@ -939,8 +932,9 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
         filepath = f"{results_dir}/trial{trial}"
         trial_metrics, tox_posteriors, eff_posteriors, util_func = online_dose_finding(
             filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param,
-            learning_rate, final_beta_param, sampling_timesteps, increase_beta_param,
-            use_utility, use_gpu)
+            learning_rate, tox_lengthscale_init, eff_lengthscale_init,
+            final_beta_param, sampling_timesteps, increase_beta_param,
+            use_utility, use_lcb_init, use_lcb_exp, use_gpu)
         metrics.append(trial_metrics)
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
@@ -970,6 +964,11 @@ def parse_args():
     parser.add_argument("--scenario", type=int, help="Dose scenario")
     parser.add_argument("--beta_param", type=float, help="Beta param for toxicity confidence interval.")
     parser.add_argument("--sampling_timesteps", type=int, help="Number of timesteps to run burn-in procedure.")
+    parser.add_argument("--tox_lengthscale", type=float, help="Tox GP Kernel lengthscale.")
+    parser.add_argument("--eff_lengthscale", type=float, help="Eff GP Kernel lengthscale")
+    parser.add_argument("--num_latents", type=int, help="Number of GP latents")
+    parser.add_argument("--use_lcb_init", action="store_true", help="Use LCB for initial stage.")
+    parser.add_argument("--use_lcb_exp", action="store_true", help="Use LCB for exploitation stage.")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     args = parser.parse_args()
 
@@ -998,18 +997,25 @@ def parse_args():
     scenario = args.scenario
     beta_param = args.beta_param
     sampling_timesteps = args.sampling_timesteps
+    tox_lengthscale = args.tox_lengthscale
+    eff_lengthscale = args.eff_lengthscale
+    num_latents = args.num_latents
+    use_lcb_init = args.use_lcb_init
+    use_lcb_exp = args.use_lcb_exp
     run_one = args.run_one
-    return filepath, scenarios[scenario], beta_param, sampling_timesteps, run_one
+    return filepath, scenarios[scenario], beta_param, sampling_timesteps,\
+           tox_lengthscale, eff_lengthscale, num_latents, use_lcb_init, use_lcb_exp, run_one
 
 
 if __name__ == "__main__":
-    filepath, dose_scenario, beta_param, sampling_timesteps, run_one = parse_args()
+    filepath, dose_scenario, beta_param, sampling_timesteps, tox_lengthscale_init, \
+        eff_lengthscale_init, num_latents, use_lcb_init, use_lcb_exp, run_one = parse_args()
+
     increase_beta_param = False
     use_utility = False
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    num_latents = 2
     learning_rate = 0.01
     final_beta_param = 0.
 
@@ -1019,13 +1025,15 @@ if __name__ == "__main__":
     if run_one:
         online_dose_finding(filepath, dose_scenario, patient_scenario,
                             num_samples, num_latents, beta_param, learning_rate,
+                            tox_lengthscale_init, eff_lengthscale_init,
                             final_beta_param, sampling_timesteps, increase_beta_param,
-                            use_utility, use_gpu)
+                            use_utility, use_lcb_init, use_lcb_exp, use_gpu)
     else:
         online_dose_finding_trials(filepath, num_trials, dose_scenario,
                                 patient_scenario, num_samples, num_latents,
-                                beta_param, learning_rate, final_beta_param,
+                                beta_param, learning_rate, 
+                                tox_lengthscale_init, eff_lengthscale_init, final_beta_param,
                                 sampling_timesteps, increase_beta_param, use_utility,
-                                use_gpu)
+                                use_lcb_init, use_lcb_exp, use_gpu)
 
     # offline_dose_finding()

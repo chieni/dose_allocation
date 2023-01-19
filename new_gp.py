@@ -11,7 +11,7 @@ from matplotlib import pyplot as plt
 torch.manual_seed(0)
 
 class MultitaskGPModel(gpytorch.models.ApproximateGP):
-    def __init__(self, num_latents, num_tasks, inducing_points, lengthscale_prior, outputscale_prior):
+    def __init__(self, num_latents, num_tasks, inducing_points):
         inducing_points = torch.tensor(inducing_points)
         inducing_points = inducing_points.repeat(num_latents, 1)
         inducing_points = torch.unsqueeze(inducing_points, 2)
@@ -39,8 +39,7 @@ class MultitaskGPModel(gpytorch.models.ApproximateGP):
         # )
         self.covar_module = gpytorch.kernels.ScaleKernel(
             gpytorch.kernels.RBFKernel(batch_shape=torch.Size([num_latents])),
-            batch_shape=torch.Size([num_latents]),
-            outputscale_prior=outputscale_prior
+            batch_shape=torch.Size([num_latents])
         )
 
 
@@ -65,13 +64,18 @@ class MultitaskClassificationRunner:
     Runner for ClassificationGPModel
     Train and predict on a Gaussian process model for binary classification
     '''
-    def __init__(self, num_latents, num_tasks, inducing_points, lengthscale_prior, outputscale_prior):
-        self.model = MultitaskGPModel(num_latents, num_tasks, inducing_points, lengthscale_prior, outputscale_prior)
+    def __init__(self, num_latents, num_tasks, inducing_points, lengthscale_init):
+        self.model = MultitaskGPModel(num_latents, num_tasks, inducing_points)
         self.likelihood = MultitaskBernoulliLikelihood()
+        self.lengthscale_init = lengthscale_init
+        self.num_latents = num_latents
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
-        lmc_coeffs = torch.tensor([[1., 0.7], [0., 0.3]])
-        # lmc_coeffs = torch.tensor([[1., 0.7], [0, 0.3], [0, 0.3]])
+        if self.num_latents == 2:
+            lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
+        else:
+            lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7], [0.3, 0.7]])
+        
         if use_gpu:
             self.model = self.model.cuda()
             self.likelihood = self.likelihood.cuda()
@@ -85,7 +89,7 @@ class MultitaskClassificationRunner:
 
         model_params = self.model.parameters()
         self.model.mean_module.constant = 0.
-        self.model.covar_module.base_kernel.lengthscale = 5.
+        self.model.covar_module.base_kernel.lengthscale = self.lengthscale_init
         # self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         # self.model.covar_module.base_kernel.kernels[1].raw_variance = torch.nn.Parameter(torch.tensor([[[-10.]],[[-10.]]]))
         # self.model.covar_module.base_kernel.kernels[1].offset = 1
