@@ -431,16 +431,16 @@ class DoseFindingScenarios:
         '''
         tox_model, tox_model2, eff_model, p_param = None, None, None, None
         dose_range = (0.05, 20.)
-        eff_thre = 0.2
+        eff_thre = 0.15
         tox_thre = 0.3
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
         toxicity_probs = np.array([[0.05, 0.2, 0.35,  0.45,  0.6],
                                    [0.25, 0.4, 0.55,  0.65,  0.8]])
-        efficacy_probs = np.array([[0.1, 0.2,  0.3, 0.45, 0.6],
-                                   [0.1, 0.2,  0.3, 0.45, 0.6]])
+        efficacy_probs = np.array([[0.1, 0.25,  0.3, 0.45, 0.6],
+                                   [0.1, 0.25,  0.3, 0.45, 0.6]])
         
-        optimal_doses = np.array([1, 0])
+        optimal_doses = np.array([1, 5])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
