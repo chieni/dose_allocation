@@ -11,7 +11,8 @@ def _plot_gp_helper(ax, x_train, y_train, x_true, y_true, x_test, y_test,
     ax.plot(x_test, y_test, 'b-', markevery=markevery, marker='o',label='GP Predicted')
     ax.plot(x_true, y_true, 'g-', marker='o', label='True')
     ax.plot(x_test, np.repeat(threshold, len(x_test)), 'm', label='Threshold')
-    ax.plot(x_true[selected_dose], y_test[x_mask][selected_dose], 'r', marker='o')
+    if selected_dose < len(x_true):
+        ax.plot(x_true[selected_dose], y_test[x_mask][selected_dose], 'r', marker='o')
     ax.fill_between(x_test, y_test_lower, y_test_upper, alpha=0.5)
     if set_axis:
         ax.set_ylim([0, 1.1])
