@@ -19,7 +19,7 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         # Connect to the server
-        client.connect(hostname=server_name, username='ic390', password='B!!')
+        client.connect(hostname=server_name, username='ic390', password='B!')
 
         # Create an SFTP client
         sftp = client.open_sftp()
@@ -50,8 +50,8 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
         sftp.close()
         client.close()
 
-def combine_files():
-    filepath = "results/first_pass"
+def combine_files(filepath):
+    filepath = f"results/{filepath}"
     num_scenarios = 18
     frames = []
     for scenario in range(1, num_scenarios+1):
@@ -64,4 +64,5 @@ def combine_files():
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('fifth_pass', 'exp9', 100, 2)
+# copy_files('fifth_pass', 'exp9', 100, 2)
+combine_files('fifth_pass')
