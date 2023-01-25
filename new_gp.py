@@ -64,10 +64,11 @@ class MultitaskClassificationRunner:
     Runner for ClassificationGPModel
     Train and predict on a Gaussian process model for binary classification
     '''
-    def __init__(self, num_latents, num_tasks, inducing_points, lengthscale_init):
+    def __init__(self, num_latents, num_tasks, inducing_points, lengthscale_init, mean_init):
         self.model = MultitaskGPModel(num_latents, num_tasks, inducing_points)
         self.likelihood = MultitaskBernoulliLikelihood()
         self.lengthscale_init = lengthscale_init
+        self.mean_init = mean_init
         self.num_latents = num_latents
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
@@ -88,7 +89,7 @@ class MultitaskClassificationRunner:
         self.likelihood.train()
 
         model_params = self.model.parameters()
-        self.model.mean_module.constant = 0.
+        self.model.mean_module.constant = self.mean_init
         self.model.covar_module.base_kernel.lengthscale = self.lengthscale_init
         # self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
         # self.model.covar_module.base_kernel.kernels[1].raw_variance = torch.nn.Parameter(torch.tensor([[[-10.]],[[-10.]]]))

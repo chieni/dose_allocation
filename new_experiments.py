@@ -643,6 +643,7 @@ def offline_dose_finding():
 def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         num_samples, num_latents, beta_param, learning_rate,
                         tox_lengthscale_init, eff_lengthscale_init,
+                        tox_mean_init, eff_mean_init,
                         final_beta_param, sampling_timesteps, increase_beta_param,
                         use_utility, use_lcb_init, use_lcb_exp, use_gpu):
     plots_filepath = f"{filepath}/gp_plots"
@@ -714,12 +715,14 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
         # Train model
         tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                                   dose_labels, tox_lengthscale_init)
+                                                   dose_labels, tox_lengthscale_init,
+                                                   tox_mean_init)
         tox_runner.train(x_train, y_tox_train, task_indices,
                          num_epochs, learning_rate, use_gpu)
 
         eff_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                                   dose_labels, eff_lengthscale_init)
+                                                   dose_labels, eff_lengthscale_init,
+                                                   eff_mean_init)
         eff_runner.train(x_train, y_eff_train, task_indices,
                          num_epochs, learning_rate, use_gpu)
 
@@ -863,12 +866,14 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     # Train model
     tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                               dose_labels, tox_lengthscale_init)
+                                               dose_labels, tox_lengthscale_init,
+                                               tox_mean_init)
     tox_runner.train(x_train, y_tox_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
 
     eff_runner = MultitaskClassificationRunner(num_latents, num_tasks,
-                                            dose_labels, eff_lengthscale_init)
+                                            dose_labels, eff_lengthscale_init,
+                                            eff_mean_init)
     eff_runner.train(x_train, y_eff_train, task_indices,
                      num_epochs, learning_rate, use_gpu)
     
@@ -914,7 +919,8 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
 def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_scenario,
                                num_samples, num_latents, beta_param, learning_rate, 
-                               tox_lengthscale_init, eff_lengthscale_init, final_beta_param,
+                               tox_lengthscale_init, eff_lengthscale_init, 
+                               tox_mean_init, eff_mean_init, final_beta_param,
                                sampling_timesteps, increase_beta_param, use_utility, use_lcb_init,
                                use_lcb_exp, use_gpu):
     metrics = []
@@ -933,6 +939,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
         trial_metrics, tox_posteriors, eff_posteriors, util_func = online_dose_finding(
             filepath, dose_scenario, patient_scenario, num_samples, num_latents, beta_param,
             learning_rate, tox_lengthscale_init, eff_lengthscale_init,
+            tox_mean_init, eff_mean_init,
             final_beta_param, sampling_timesteps, increase_beta_param,
             use_utility, use_lcb_init, use_lcb_exp, use_gpu)
         metrics.append(trial_metrics)
@@ -966,6 +973,8 @@ def parse_args():
     parser.add_argument("--sampling_timesteps", type=int, help="Number of timesteps to run burn-in procedure.")
     parser.add_argument("--tox_lengthscale", type=float, help="Tox GP Kernel lengthscale.")
     parser.add_argument("--eff_lengthscale", type=float, help="Eff GP Kernel lengthscale")
+    parser.add_argument("--tox_mean", type=float, help="Tox mean constant")
+    parser.add_argument("--eff_mean", type=float, help="Eff mean constant")
     parser.add_argument("--num_latents", type=int, help="Number of GP latents")
     parser.add_argument("--use_lcb_init", action="store_true", help="Use LCB for initial stage.")
     parser.add_argument("--use_lcb_exp", action="store_true", help="Use LCB for exploitation stage.")
@@ -999,17 +1008,19 @@ def parse_args():
     sampling_timesteps = args.sampling_timesteps
     tox_lengthscale = args.tox_lengthscale
     eff_lengthscale = args.eff_lengthscale
+    tox_mean = args.tox_mean
+    eff_mean = args.eff_mean
     num_latents = args.num_latents
     use_lcb_init = args.use_lcb_init
     use_lcb_exp = args.use_lcb_exp
     run_one = args.run_one
     return filepath, scenarios[scenario], beta_param, sampling_timesteps,\
-           tox_lengthscale, eff_lengthscale, num_latents, use_lcb_init, use_lcb_exp, run_one
+           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, num_latents, use_lcb_init, use_lcb_exp, run_one
 
 
 if __name__ == "__main__":
     filepath, dose_scenario, beta_param, sampling_timesteps, tox_lengthscale_init, \
-        eff_lengthscale_init, num_latents, use_lcb_init, use_lcb_exp, run_one = parse_args()
+        eff_lengthscale_init, tox_mean_init, eff_mean_init, num_latents, use_lcb_init, use_lcb_exp, run_one = parse_args()
 
     increase_beta_param = False
     use_utility = False
@@ -1026,13 +1037,15 @@ if __name__ == "__main__":
         online_dose_finding(filepath, dose_scenario, patient_scenario,
                             num_samples, num_latents, beta_param, learning_rate,
                             tox_lengthscale_init, eff_lengthscale_init,
+                            tox_mean_init, eff_mean_init,
                             final_beta_param, sampling_timesteps, increase_beta_param,
                             use_utility, use_lcb_init, use_lcb_exp, use_gpu)
     else:
         online_dose_finding_trials(filepath, num_trials, dose_scenario,
                                 patient_scenario, num_samples, num_latents,
                                 beta_param, learning_rate, 
-                                tox_lengthscale_init, eff_lengthscale_init, final_beta_param,
+                                tox_lengthscale_init, eff_lengthscale_init, 
+                                tox_mean_init, eff_mean_init, final_beta_param,
                                 sampling_timesteps, increase_beta_param, use_utility,
                                 use_lcb_init, use_lcb_exp, use_gpu)
 
