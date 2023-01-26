@@ -102,8 +102,8 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 # test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight)
 
 
-filepath = "results/fifth_pass"
-use_thall = True
+filepath = "results/seventh_pass"
+use_thall = False
 num_subgroups = 2
 
 scenarios = {

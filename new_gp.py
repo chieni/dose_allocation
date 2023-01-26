@@ -71,11 +71,12 @@ class MultitaskClassificationRunner:
         self.mean_init = mean_init
         self.num_latents = num_latents
 
-    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu):
+    def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu, set_lmc):
         if self.num_latents == 2:
             lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
         else:
-            lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7], [0.3, 0.7]])
+            lmc_coeffs = torch.tensor([[1.0, 0.], [0.2, 0.2], [0., 1.]])
+            # lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7], [0.3, 0.7]])
         
         if use_gpu:
             self.model = self.model.cuda()
@@ -91,19 +92,14 @@ class MultitaskClassificationRunner:
         model_params = self.model.parameters()
         self.model.mean_module.constant = self.mean_init
         self.model.covar_module.base_kernel.lengthscale = self.lengthscale_init
-        # self.model.covar_module.base_kernel.kernels[0].lengthscale = 2
-        # self.model.covar_module.base_kernel.kernels[1].raw_variance = torch.nn.Parameter(torch.tensor([[[-10.]],[[-10.]]]))
-        # self.model.covar_module.base_kernel.kernels[1].offset = 1
         self.model.covar_module.base_kernel.outputscale = 1.
         self.model.variational_strategy.lmc_coefficients = torch.nn.Parameter(lmc_coeffs)
-
+        
         model_params = list(set(model_params) - {self.model.covar_module.base_kernel.raw_lengthscale})
-        # model_params = list(set(self.model.parameters()) - {self.model.covar_module.base_kernel.kernels[0].raw_lengthscale})
-        # model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_variance})
-        # model_params = list(set(model_params) - {self.model.covar_module.base_kernel.kernels[1].raw_offset})
         model_params = list(set(model_params) - {self.model.covar_module.raw_outputscale})
-        model_params = list(set(model_params) - {self.model.variational_strategy.lmc_coefficients})
         model_params = list(set(model_params) - {self.model.mean_module.raw_constant})
+        if set_lmc:
+            model_params = list(set(model_params) - {self.model.variational_strategy.lmc_coefficients})
         
         optimizer = torch.optim.Adam([{'params': model_params},
                                       {'params': self.likelihood.parameters()},], lr=learning_rate)
