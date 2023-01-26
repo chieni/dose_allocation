@@ -492,7 +492,7 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
 
 def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
                       tox_posteriors, eff_posteriors, 
-                      tox_thre, eff_thre, tox_weight, eff_weight, final_beta_param):
+                      tox_thre, eff_thre, tox_weight, eff_weight, final_beta_param, use_thall=False):
     x_mask = np.isin(x_test, dose_labels)
     dose_rec = np.ones(num_subgroups) * num_doses
     final_utilities = np.empty((num_subgroups, num_doses))
@@ -517,15 +517,27 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
         # Calculate utilities
         utilities = calculate_utility(tox_mean, eff_mean, tox_thre, eff_thre,
                                       tox_weight, eff_weight)
+        thall_utilities = calculate_utility_thall(tox_mean, eff_mean,
+                                                  dose_scenario.toxicity_threshold,
+                                                  dose_scenario.efficacy_threshold,
+                                                  dose_scenario.p_param)
+
         eff_mean[~dose_set_mask] = -np.inf
         utilities[~dose_set_mask] = -np.inf
-        final_utilities[subgroup_idx, :] = utilities
-  
+        thall_utilities[~dose_set_mask] = -np.inf
+
         max_eff = eff_mean.max()
         max_eff_idx = np.where(eff_mean == max_eff)[0][-1]
 
-        max_utility = utilities.max()
-        max_util_idx = np.where(utilities == max_utility)[0][-1]
+        if use_thall:
+            max_utility = thall_utilities.max()
+            max_util_idx = np.where(thall_utilities == max_utility)[0][-1]
+            final_utilities[subgroup_idx, :] = thall_utilities
+            
+        else:
+            max_utility = utilities.max()
+            max_util_idx = np.where(utilities == max_utility)[0][-1]
+            final_utilities[subgroup_idx, :] = utilities
 
         # If recommended dose is above eff threshold assign this dose, else assign no dose.
         if eff_mean[max_util_idx] >= eff_thre: 
@@ -545,7 +557,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                         tox_lengthscale_init, eff_lengthscale_init,
                         tox_mean_init, eff_mean_init,
                         final_beta_param, sampling_timesteps, increase_beta_param,
-                        use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_gpu):
+                        use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_thall, use_gpu):
     plots_filepath = f"{filepath}/gp_plots"
     latent_plots_filepath = f"{filepath}/latent_gp_plots"
     if not os.path.exists(filepath):
@@ -716,12 +728,19 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                 #                       use_utility=False)
 
             # Calculate utility
-            util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
-                                                           y_eff_posteriors.mean[subgroup_idx, :],
-                                                           dose_scenario.toxicity_threshold,
-                                                           dose_scenario.efficacy_threshold,
-                                                           dose_scenario.tox_weight,
-                                                           dose_scenario.eff_weight)
+            if use_thall:
+                util_func[subgroup_idx, :] = calculate_utility_thall(y_tox_posteriors.mean[subgroup_idx, :],
+                                                            y_eff_posteriors.mean[subgroup_idx, :],
+                                                            dose_scenario.toxicity_threshold,
+                                                            dose_scenario.efficacy_threshold,
+                                                            dose_scenario.p_param)
+            else:
+                util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
+                                                            y_eff_posteriors.mean[subgroup_idx, :],
+                                                            dose_scenario.toxicity_threshold,
+                                                            dose_scenario.efficacy_threshold,
+                                                            dose_scenario.tox_weight,
+                                                            dose_scenario.eff_weight)
 
         print(f"Selected dose by subgroup: {selected_dose_by_subgroup}")
 
@@ -784,15 +803,14 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                             x_test, num_confidence_samples, use_gpu)
 
     # Select final dose
-    tox_weight = 1.
-    eff_weight = dose_scenario.toxicity_threshold / dose_scenario.efficacy_threshold
     final_selected_doses, final_utilities = select_final_dose(num_subgroups, num_doses, 
                                                               dose_labels, x_test, y_tox_posteriors,
                                                               y_eff_posteriors,
                                                               dose_scenario.toxicity_threshold,
                                                               dose_scenario.efficacy_threshold,
-                                                              tox_weight,
-                                                              eff_weight, final_beta_param)
+                                                              dose_scenario.tox_weight,
+                                                              dose_scenario.eff_weight, final_beta_param,
+                                                              use_thall)
 
     experiment_metrics = DoseExperimentMetrics(dose_scenario, patients, selected_doses,
                                                tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask],
@@ -803,11 +821,18 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     # Calculate utilities
     util_func = np.empty((num_subgroups, len(np_x_test)))
     for subgroup_idx in range(num_subgroups):
-        util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
-                                                       y_eff_posteriors.mean[subgroup_idx, :],
-                                                       dose_scenario.toxicity_threshold,
-                                                       dose_scenario.efficacy_threshold,
-                                                       tox_weight, eff_weight)
+        if use_thall:
+            util_func[subgroup_idx, :] = calculate_utility_thall(y_tox_posteriors.mean[subgroup_idx, :],
+                                                        y_eff_posteriors.mean[subgroup_idx, :],
+                                                        dose_scenario.toxicity_threshold,
+                                                        dose_scenario.efficacy_threshold,
+                                                        dose_scenario.p_param)
+        else:
+            util_func[subgroup_idx, :] = calculate_utility(y_tox_posteriors.mean[subgroup_idx, :],
+                                                        y_eff_posteriors.mean[subgroup_idx, :],
+                                                        dose_scenario.toxicity_threshold,
+                                                        dose_scenario.efficacy_threshold,
+                                                        dose_scenario.tox_weight, dose_scenario.eff_weight)
 
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
@@ -824,7 +849,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
                                tox_lengthscale_init, eff_lengthscale_init, 
                                tox_mean_init, eff_mean_init, final_beta_param,
                                sampling_timesteps, increase_beta_param, use_utility, use_lcb_init,
-                               use_lcb_exp, set_lmc, use_gpu):
+                               use_lcb_exp, set_lmc, use_thall, use_gpu):
     metrics = []
     x_true = dose_scenario.dose_labels.astype(np.float32)
     x_test = np.concatenate([np.arange(x_true.min(), x_true.max(), 0.05, dtype=np.float32), x_true])
@@ -843,7 +868,7 @@ def online_dose_finding_trials(results_dir, num_trials, dose_scenario, patient_s
             learning_rate, tox_lengthscale_init, eff_lengthscale_init,
             tox_mean_init, eff_mean_init,
             final_beta_param, sampling_timesteps, increase_beta_param,
-            use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_gpu)
+            use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_thall, use_gpu)
         metrics.append(trial_metrics)
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
@@ -881,6 +906,7 @@ def parse_args():
     parser.add_argument("--use_lcb_init", action="store_true", help="Use LCB for initial stage.")
     parser.add_argument("--use_lcb_exp", action="store_true", help="Use LCB for exploitation stage.")
     parser.add_argument("--set_lmc", action="store_true", help="Fix LMC coeffs for final model if true.")
+    parser.add_argument("--use_thall", action="store_true", help="Use Thall utility.")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     args = parser.parse_args()
 
@@ -917,14 +943,15 @@ def parse_args():
     use_lcb_init = args.use_lcb_init
     use_lcb_exp = args.use_lcb_exp
     set_lmc = args.set_lmc
+    use_thall = args.use_thall
     run_one = args.run_one
     return filepath, scenarios[scenario], beta_param, sampling_timesteps,\
-           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, num_latents, use_lcb_init, use_lcb_exp, set_lmc, run_one
+           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one
 
 
 if __name__ == "__main__":
     filepath, dose_scenario, beta_param, sampling_timesteps, tox_lengthscale_init, \
-        eff_lengthscale_init, tox_mean_init, eff_mean_init, num_latents, use_lcb_init, use_lcb_exp, set_lmc, run_one = parse_args()
+        eff_lengthscale_init, tox_mean_init, eff_mean_init, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one = parse_args()
 
     increase_beta_param = False
     use_utility = False
@@ -938,7 +965,7 @@ if __name__ == "__main__":
     patient_scenario = TrialPopulationScenarios.equal_population(2)
 
     # Calculate tox_mean_init and eff_mean_init based on thresholds
-    tox_mean_init = NormalDist().inv_cdf(dose_scenario.toxicity_threshold - 0.1)
+    # tox_mean_init = NormalDist().inv_cdf(dose_scenario.toxicity_threshold)
     # eff_mean_init = NormalDist().inv_cdf(dose_scenario.efficacy_threshold)
 
     print(f"Tox mean: {tox_mean_init}")
@@ -949,7 +976,7 @@ if __name__ == "__main__":
                             tox_lengthscale_init, eff_lengthscale_init,
                             tox_mean_init, eff_mean_init,
                             final_beta_param, sampling_timesteps, increase_beta_param,
-                            use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_gpu)
+                            use_utility, use_lcb_init, use_lcb_exp, set_lmc, use_thall, use_gpu)
     else:
         online_dose_finding_trials(filepath, num_trials, dose_scenario,
                                 patient_scenario, num_samples, num_latents,
@@ -957,4 +984,4 @@ if __name__ == "__main__":
                                 tox_lengthscale_init, eff_lengthscale_init, 
                                 tox_mean_init, eff_mean_init, final_beta_param,
                                 sampling_timesteps, increase_beta_param, use_utility,
-                                use_lcb_init, use_lcb_exp, set_lmc, use_gpu)
+                                use_lcb_init, use_lcb_exp, set_lmc, use_thall, use_gpu)

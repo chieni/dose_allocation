@@ -12,17 +12,18 @@ from data_generation import DoseFindingScenarios, TrialPopulationScenarios
 
 np.random.seed(0)
 class ExperimentRunner:
-    def __init__(self, reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate):
+    def __init__(self, reps, scenario, num_patients, arr_rate, learning_rate):
         self.reps = reps
-        self.num_doses = num_doses
+        self.dose_scenario = scenario
+        self.num_doses = scenario.num_doses
         self.num_patients = num_patients
-        self.num_subgroups = num_subgroups
+        self.num_subgroups = scenario.num_subgroups
         self.arr_rate = arr_rate
-        self.tox_thre = tox_thre
-        self.eff_thre = eff_thre
-        self.p_true = p_true # tox
-        self.q_true = q_true # eff
-        self.opt = opt
+        self.tox_thre = scenario.toxicity_threshold
+        self.eff_thre = scenario.efficacy_threshold
+        self.p_true = scenario.toxicity_probs # tox
+        self.q_true = scenario.efficacy_probs # eff
+        self.opt = scenario.optimal_doses
         self.learning_rate = learning_rate
 
     def gen_patients(self):
@@ -230,7 +231,7 @@ class ExperimentRunner:
                 #dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(p_true[s, :], a0, b0)
                 dose_labels[s, :] = TanhModel.initialize_dose_label(dose_skeleton, a0)
         
-            run_metrics = model.run_model(self.tox_thre, self.eff_thre, self.p_true, self.q_true, self.opt, dose_labels)
+            run_metrics = model.run_model(self.dose_scenario, dose_labels)
             metrics_objects.append(run_metrics)
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
@@ -328,18 +329,12 @@ def main2(scenario, filepath):
     num_patients = 51
     learning_rate = 0.01
 
-    num_doses = scenario.num_doses
     num_subgroups = scenario.num_subgroups
-    tox_thre = scenario.toxicity_threshold
-    eff_thre = scenario.efficacy_threshold
-    p_true = scenario.toxicity_probs
-    q_true = scenario.efficacy_probs
-    opt = scenario.optimal_doses
 
     patient_scenario = TrialPopulationScenarios.equal_population(num_subgroups)
     arr_rate = patient_scenario.arrival_rate
 
-    runner = ExperimentRunner(reps, num_doses, num_patients, num_subgroups, arr_rate, tox_thre, eff_thre, p_true, q_true, opt, learning_rate)
+    runner = ExperimentRunner(reps, scenario, num_patients, arr_rate, learning_rate)
 
     # a0 = 0.1
     # b0 = 0.1
@@ -350,7 +345,7 @@ def main2(scenario, filepath):
     runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    folder_name = "c3t_more2"
+    folder_name = "c3t_more4"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),

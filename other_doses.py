@@ -52,7 +52,7 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
             thall_utilities = calculate_dose_utility_thall(tox_means, eff_means,
                                                         dose_scenario.toxicity_threshold,
                                                         dose_scenario.efficacy_threshold,
-                                                        2.1)
+                                                        dose_scenario.p_param)
 
             eff_means[~dose_set_mask] = -np.inf
             utilities[~dose_set_mask] = -np.inf
@@ -66,6 +66,8 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 
             max_util_thall = thall_utilities.max()
             max_util_thall_idx = np.where(thall_utilities == max_util_thall)[0][-1]
+            if subgroup_idx==0:
+                print(thall_utilities)
             
             # if max_eff >= dose_scenario.efficacy_threshold:
             #     dose_rec[trial, subgroup_idx] = max_eff_idx
@@ -79,27 +81,31 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
             else:
                 if eff_means[max_util_thall_idx] >= dose_scenario.efficacy_threshold:
                     dose_rec[trial, subgroup_idx] = max_util_thall_idx
+                else:
+                    # Try highest eff in safe range
+                    if max_eff >= dose_scenario.efficacy_threshold:
+                        dose_rec[trial, subgroup_idx] = max_eff_idx     
 
             
         dose_err[trial, :] = (dose_rec[trial, :] != optimal_doses).astype(np.float32)
 
-    # for subgroup_idx in range(num_subgroups):
-    #     values, counts = np.unique(dose_rec[:, subgroup_idx], return_counts=True)
-    #     print(f"Subgroup {subgroup_idx}")
-    #     print(values)
-    #     print(counts)
+    for subgroup_idx in range(num_subgroups):
+        values, counts = np.unique(dose_rec[:, subgroup_idx], return_counts=True)
+        print(f"Subgroup {subgroup_idx}")
+        print(values)
+        print(counts)
 
     print(dose_err.mean(axis=0))
     return dose_err.mean(axis=0)
 
 
 
-# filepath = "results/fifth_pass/scenario18"
-# dose_scenario = DoseFindingScenarios.paper_example_18()
+# filepath = "results/eighth_pass/scenario3"
+# dose_scenario = DoseFindingScenarios.paper_example_3()
 # tox_weight = 1
 # eff_weight = dose_scenario.toxicity_threshold/dose_scenario.efficacy_threshold
 
-# test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight)
+# test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight, True)
 
 
 filepath = "results/seventh_pass"
@@ -130,7 +136,7 @@ scenarios = {
 frame = pd.DataFrame(index=np.arange(num_subgroups))
 for idx, scenario in scenarios.items():
     sub_filepath = f"{filepath}/scenario{idx}"
-    tox_weight = 1
+    tox_weight = 1.
     eff_weight = scenario.toxicity_threshold/scenario.efficacy_threshold
     print(f"Eff weight: {eff_weight}")
     frame[f"scenario{idx}"] = test_select_final_dose_method(sub_filepath, scenario, tox_weight, eff_weight, use_thall)
@@ -139,5 +145,3 @@ if use_thall:
     frame.to_csv(f"{filepath}/thall_final_dose_error.csv")
 else:
     frame.to_csv(f"{filepath}/test_final_dose_error.csv")
-
-

@@ -3,8 +3,8 @@ import pandas as pd
 import seaborn as sns
 
 
-def dose_error_plot(gp_filename):
-    c3t_filename = "results/c3t_more/final dose error.csv"
+def dose_error_plot(c3t_folder_name, gp_filename):
+    c3t_filename = f"results/{c3t_folder_name}/final dose error.csv"
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
@@ -23,8 +23,8 @@ def dose_error_plot(gp_filename):
     sns.pointplot(data=frame, x='scenario', y='dose_error', hue='method', join=False)
     plt.show()
 
-def safety_plot(gp_filename):
-    c3t_filename = "results/c3t_more/safety violations.csv"
+def safety_plot(c3t_folder_name, gp_filename):
+    c3t_filename = f"results/{c3t_folder_name}/safety violations.csv"
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
@@ -43,9 +43,8 @@ def safety_plot(gp_filename):
     sns.pointplot(data=frame, x='scenario', y='safety_violations', hue='method', join=False)
     plt.show()
 
-def tox_plot():
-    c3t_filename = "results/c3t_more/toxicity by person.csv"
-    gp_filename ="results/sixth_pass/tox_outcome.csv"
+def tox_plot(c3t_folder_name, gp_filename):
+    c3t_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='toxicity')
@@ -65,8 +64,8 @@ def tox_plot():
     plt.show()
 
 
-def eff_plot(gp_filename):
-    c3t_filename = "results/c3t_more/efficacy by person.csv"
+def eff_plot(c3t_folder_name, gp_filename):
+    c3t_filename = f"results/{c3t_folder_name}/efficacy by person.csv"
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='efficacy')
@@ -85,12 +84,29 @@ def eff_plot(gp_filename):
     sns.pointplot(data=frame, x='scenario', y='efficacy', hue='method', join=False)
     plt.show()
 
+def utility_plot(c3t_folder_name, gp_filename):
+    c3t_filename = f"results/{c3t_folder_name}/utility.csv"
 
-def tox_eff_plot():
-    c3t_tox_filename = "results/c3t_more/toxicity by person.csv"
-    c3t_eff_filename = "results/c3t_more/efficacy by person.csv"
-    gp_tox_filename = "results/fifth_pass/tox_outcome.csv"
-    gp_eff_filename = "results/fifth_pass/eff_outcome.csv"
+    c3t_frame = pd.read_csv(c3t_filename, index_col=0)
+    c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
+    c3t_melt['method'] = 'c3t'
+
+    gp_frame = pd.read_csv(gp_filename, index_col=0)
+    gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
+    gp_melt['method'] = 'gp'
+
+    frame = pd.concat([c3t_melt, gp_melt])
+    frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
+
+    sns.set()
+    plt.figure(figsize=(12, 4))
+    frame = frame[frame['index'] != 'overall']
+    sns.pointplot(data=frame, x='scenario', y='utility', hue='method', join=False)
+    plt.show()
+
+def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename):
+    c3t_tox_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
+    c3t_eff_filename = f"results/{c3t_folder_name}/efficacy by person.csv"
 
     c3t_tox_frame = pd.read_csv(c3t_tox_filename, index_col=0)
     c3t_eff_frame = pd.read_csv(c3t_eff_filename, index_col=0)
@@ -119,7 +135,19 @@ def tox_eff_plot():
     sns.scatterplot(data=frame, x='eff', y='tox', hue='method', style='index')
     plt.show()
 
-gp_filename = "results/seventh_pass/test_final_dose_error.csv"
-gp_filename = "results/seventh_pass/safety_violations.csv"
-gp_filename ="results/seventh_pass/eff_outcome.csv"
-eff_plot(gp_filename)
+folder_name = "eighth_pass"
+dose_filename = f"results/{folder_name}/final_dose_error.csv"
+thall_filename = f"results/{folder_name}/thall_final_dose_error.csv"
+safety_filename = f"results/{folder_name}/safety_violations.csv"
+tox_filename = f"results/{folder_name}/tox_outcome.csv"
+eff_filename = f"results/{folder_name}/eff_outcome.csv"
+utility_filename = f"results/{folder_name}/utility.csv"
+
+c3t_folder_name = "c3t_more4"
+
+dose_error_plot(c3t_folder_name, dose_filename)
+#safety_plot(c3t_folder_name, safety_filename)
+#utility_plot(c3t_folder_name, utility_filename)
+#tox_plot(c3t_folder_name, tox_filename)
+#eff_plot(c3t_folder_name, eff_filename)
+#tox_eff_plot(c3t_folder_name, tox_filename, eff_filename)
