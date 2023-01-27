@@ -130,8 +130,10 @@ class DoseExperimentMetrics:
 def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
     tox_term = (tox_means - tox_thre) ** 2
     eff_term = (eff_means - eff_thre) ** 2
-    tox_term[tox_means > tox_thre] = 0.
-    eff_term[eff_means < eff_thre] = 0.
+    # tox_term[tox_means > tox_thre] = 0.
+    # eff_term[eff_means < eff_thre] = 0.
+    tox_term[tox_means > tox_thre] = -tox_term[tox_means > tox_thre]
+    eff_term[eff_means < eff_thre] = 0
     return (tox_weight * tox_term) + (eff_weight * eff_term)
 
 def calculate_utility_thall(tox_probs, eff_probs, tox_thre, eff_thre, p_param):

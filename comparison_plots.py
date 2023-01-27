@@ -135,19 +135,19 @@ def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename):
     sns.scatterplot(data=frame, x='eff', y='tox', hue='method', style='index')
     plt.show()
 
-folder_name = "eighth_pass"
-dose_filename = f"results/{folder_name}/final_dose_error.csv"
+folder_name = "ninth_pass"
+dose_filename = f"results/{folder_name}/test_final_dose_error.csv"
 thall_filename = f"results/{folder_name}/thall_final_dose_error.csv"
 safety_filename = f"results/{folder_name}/safety_violations.csv"
 tox_filename = f"results/{folder_name}/tox_outcome.csv"
 eff_filename = f"results/{folder_name}/eff_outcome.csv"
 utility_filename = f"results/{folder_name}/utility.csv"
 
-c3t_folder_name = "c3t_more4"
+c3t_folder_name = "c3t_more5"
 
-dose_error_plot(c3t_folder_name, dose_filename)
+#dose_error_plot(c3t_folder_name, thall_filename)
 #safety_plot(c3t_folder_name, safety_filename)
-#utility_plot(c3t_folder_name, utility_filename)
+utility_plot(c3t_folder_name, utility_filename)
 #tox_plot(c3t_folder_name, tox_filename)
 #eff_plot(c3t_folder_name, eff_filename)
 #tox_eff_plot(c3t_folder_name, tox_filename, eff_filename)

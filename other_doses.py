@@ -14,7 +14,9 @@ def calculate_dose_utility_thall(tox_values, eff_values, tox_thre, eff_thre, p_p
 def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
     tox_term = (tox_means - tox_thre) ** 2
     eff_term = (eff_means - eff_thre) ** 2
-    tox_term[tox_means > tox_thre] = 0.
+    # tox_term[tox_means > tox_thre] = 0.
+    # eff_term[eff_means < eff_thre] = 0.
+    tox_term[tox_means > tox_thre] = -tox_term[tox_means > tox_thre]
     eff_term[eff_means < eff_thre] = 0.
     return (tox_weight * tox_term) + (eff_weight * eff_term)
 
@@ -66,25 +68,27 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 
             max_util_thall = thall_utilities.max()
             max_util_thall_idx = np.where(thall_utilities == max_util_thall)[0][-1]
-            if subgroup_idx==0:
+
+            if subgroup_idx ==0:
+                print(dose_set_mask)
                 print(thall_utilities)
             
             # if max_eff >= dose_scenario.efficacy_threshold:
             #     dose_rec[trial, subgroup_idx] = max_eff_idx
             if not use_thall:
-                if eff_means[max_util_idx] >= dose_scenario.efficacy_threshold:
+                if eff_means[max_util_idx] >= dose_scenario.efficacy_threshold and max_util >= 0.:
                     dose_rec[trial, subgroup_idx] = max_util_idx
-                else:
-                    # Try highest eff in safe range
-                    if max_eff >= dose_scenario.efficacy_threshold:
-                        dose_rec[trial, subgroup_idx] = max_eff_idx
+                # else:
+                #     # Try highest eff in safe range
+                #     if max_eff >= dose_scenario.efficacy_threshold:
+                #         dose_rec[trial, subgroup_idx] = max_eff_idx
             else:
-                if eff_means[max_util_thall_idx] >= dose_scenario.efficacy_threshold:
+                if eff_means[max_util_thall_idx] >= dose_scenario.efficacy_threshold and max_util_thall >= -0.1:
                     dose_rec[trial, subgroup_idx] = max_util_thall_idx
-                else:
-                    # Try highest eff in safe range
-                    if max_eff >= dose_scenario.efficacy_threshold:
-                        dose_rec[trial, subgroup_idx] = max_eff_idx     
+                # else:
+                #     # Try highest eff in safe range
+                #     if max_eff >= dose_scenario.efficacy_threshold:
+                #         dose_rec[trial, subgroup_idx] = max_eff_idx     
 
             
         dose_err[trial, :] = (dose_rec[trial, :] != optimal_doses).astype(np.float32)
@@ -100,48 +104,50 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 
 
 
-# filepath = "results/eighth_pass/scenario3"
-# dose_scenario = DoseFindingScenarios.paper_example_3()
-# tox_weight = 1
-# eff_weight = dose_scenario.toxicity_threshold/dose_scenario.efficacy_threshold
+filepath = "results/ninth_pass/scenario12"
+dose_scenario = DoseFindingScenarios.paper_example_12()
+tox_weight = 1
+eff_weight = dose_scenario.toxicity_threshold/dose_scenario.efficacy_threshold
+tox_weight = 1.5
+eff_weight = 1
 
-# test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight, True)
+test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight, True)
 
 
-filepath = "results/seventh_pass"
-use_thall = False
-num_subgroups = 2
+# filepath = "results/ninth_pass"
+# use_thall = True
+# num_subgroups = 2
 
-scenarios = {
-    1: DoseFindingScenarios.paper_example_1(),
-    2: DoseFindingScenarios.paper_example_2(),
-    3: DoseFindingScenarios.paper_example_3(),
-    4: DoseFindingScenarios.paper_example_4(),
-    5: DoseFindingScenarios.paper_example_5(),
-    6: DoseFindingScenarios.paper_example_6(),
-    7: DoseFindingScenarios.paper_example_7(),
-    8: DoseFindingScenarios.paper_example_8(),
-    9: DoseFindingScenarios.paper_example_9(),
-    10: DoseFindingScenarios.paper_example_10(),
-    11: DoseFindingScenarios.paper_example_11(),
-    12: DoseFindingScenarios.paper_example_12(),
-    13: DoseFindingScenarios.paper_example_13(),
-    14: DoseFindingScenarios.paper_example_14(),
-    15: DoseFindingScenarios.paper_example_15(),
-    16: DoseFindingScenarios.paper_example_16(),
-    17: DoseFindingScenarios.paper_example_17(),
-    18: DoseFindingScenarios.paper_example_18()
-}
+# scenarios = {
+#     1: DoseFindingScenarios.paper_example_1(),
+#     2: DoseFindingScenarios.paper_example_2(),
+#     3: DoseFindingScenarios.paper_example_3(),
+#     4: DoseFindingScenarios.paper_example_4(),
+#     5: DoseFindingScenarios.paper_example_5(),
+#     6: DoseFindingScenarios.paper_example_6(),
+#     7: DoseFindingScenarios.paper_example_7(),
+#     8: DoseFindingScenarios.paper_example_8(),
+#     9: DoseFindingScenarios.paper_example_9(),
+#     10: DoseFindingScenarios.paper_example_10(),
+#     11: DoseFindingScenarios.paper_example_11(),
+#     12: DoseFindingScenarios.paper_example_12(),
+#     13: DoseFindingScenarios.paper_example_13(),
+#     14: DoseFindingScenarios.paper_example_14(),
+#     15: DoseFindingScenarios.paper_example_15(),
+#     16: DoseFindingScenarios.paper_example_16(),
+#     17: DoseFindingScenarios.paper_example_17(),
+#     18: DoseFindingScenarios.paper_example_18()
+# }
 
-frame = pd.DataFrame(index=np.arange(num_subgroups))
-for idx, scenario in scenarios.items():
-    sub_filepath = f"{filepath}/scenario{idx}"
-    tox_weight = 1.
-    eff_weight = scenario.toxicity_threshold/scenario.efficacy_threshold
-    print(f"Eff weight: {eff_weight}")
-    frame[f"scenario{idx}"] = test_select_final_dose_method(sub_filepath, scenario, tox_weight, eff_weight, use_thall)
+# frame = pd.DataFrame(index=np.arange(num_subgroups))
+# for idx, scenario in scenarios.items():
+#     sub_filepath = f"{filepath}/scenario{idx}"
+#     tox_weight = 1.
+#     eff_weight = scenario.toxicity_threshold/scenario.efficacy_threshold
+#     print(f"Eff weight: {eff_weight}")
+#     frame[f"scenario{idx}"] = test_select_final_dose_method(sub_filepath, scenario, tox_weight, eff_weight, use_thall)
 
-if use_thall:
-    frame.to_csv(f"{filepath}/thall_final_dose_error.csv")
-else:
-    frame.to_csv(f"{filepath}/test_final_dose_error.csv")
+# if use_thall:
+#     frame.to_csv(f"{filepath}/thall_final_dose_error.csv")
+# else:
+#     frame.to_csv(f"{filepath}/test_final_dose_error.csv")

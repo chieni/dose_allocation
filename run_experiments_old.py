@@ -345,7 +345,7 @@ def main2(scenario, filepath):
     runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    folder_name = "c3t_more4"
+    folder_name = "c3t_more5"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),
