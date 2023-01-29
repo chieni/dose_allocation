@@ -11,6 +11,12 @@ from metrics import TrialMetrics
 
 
 
+def calculate_dose_utility_thall(tox_values, eff_values, tox_thre, eff_thre, p_param):
+    tox_term = (tox_values / tox_thre) ** p_param
+    eff_term = ((1. - eff_values) / (1. - eff_thre)) ** p_param
+    utilities = 1. - ( tox_term + eff_term ) ** (1. / p_param)
+    return utilities
+
 def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
     tox_term = (tox_means - tox_thre) ** 2
     eff_term = (eff_means - eff_thre) ** 2
@@ -110,7 +116,7 @@ class DoseFindingModel:
 
 
     def finalize_results(self, timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind, q_true, tox_weight,
-                         eff_weight):
+                         eff_weight, p_param):
         '''
         Originally finalize_results_with_gradient_shared_param
         '''
@@ -152,6 +158,8 @@ class DoseFindingModel:
         selected_eff_probs = np.array([q_true[group_idx, arm_idx] for group_idx, arm_idx in zip(self.patients, self.allocated_doses)])
         utilities = calculate_utility(selected_tox_probs, selected_eff_probs, tox_thre, eff_thre,
                                       tox_weight=tox_weight, eff_weight=eff_weight)
+        thall_utilities = calculate_dose_utility_thall(selected_tox_probs, selected_eff_probs, tox_thre, eff_thre,
+                                                      p_param)
 
         self.metrics.typeI = self.metrics.typeI / self.num_doses
         self.metrics.typeII = self.metrics.typeII / self.num_doses
@@ -161,8 +169,10 @@ class DoseFindingModel:
         for s in range(self.num_subgroups):
             self.metrics.safety_violations[s] = safety_violations[self.patients == s].sum() 
             self.metrics.utility_by_person[s] = utilities[self.patients == s].sum()
+            self.metrics.thall_utility[s] = thall_utilities[self.patients == s].sum()
         self.metrics.safety_violations = self.metrics.safety_violations / self.metrics.pats_count
         self.metrics.utility_by_person = self.metrics.utility_by_person / self.metrics.pats_count
+        self.metrics.thall_utility = self.metrics.thall_utility / self.metrics.pats_count
         self.metrics.dose_err_by_person = self.metrics.rec_err / self.metrics.pats_count
         self.metrics.cum_eff_by_person = self.metrics.cum_eff[:, -1] / self.metrics.pats_count
         self.metrics.cum_tox_by_person = self.metrics.cum_tox[:, -1] / self.metrics.pats_count
@@ -654,7 +664,7 @@ class OGTanhModel(TanhModel):
             self.model_toxicity_estimate[s, :] = self.get_toxicity_helper(dose_labels[s, :], self.current_a_hat[s, -1])
 
         self.finalize_results(timestep, dose_labels, tox_thre, eff_thre, p_true, opt_ind,
-                              q_true, dose_scenario.tox_weight, dose_scenario.eff_weight)
+                              q_true, dose_scenario.tox_weight, dose_scenario.eff_weight, dose_scenario.p_param)
         self.metrics.a_hat_fin = self.current_a_hat[:, -1]
 
         return self.metrics

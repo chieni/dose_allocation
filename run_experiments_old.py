@@ -54,6 +54,7 @@ class ExperimentRunner:
         metrics_frame = pd.DataFrame({'subgroup': list(np.arange(num_subgroups)) + ['overall'],
                                       'safety violations': list(out_metrics.safety_violations.mean(axis=1)) + [out_metrics.safety_violations.mean()],
                                       'utility': list(out_metrics.utility_by_person.mean(axis=1)) + [out_metrics.utility_by_person.mean()],
+                                      'thall_utility': list(out_metrics.thall_utility.mean(axis=1)) + [out_metrics.utility_by_person.mean()],
                                       'dose error by person': list(out_metrics.regret_by_person.mean(axis=1)) + [out_metrics.regret[:, -1, :].sum(axis=0).mean() / num_patients], # incorrect dose assignments
                                       'efficacy regret': list(out_metrics.eff_regret[:, -1, :].mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean()],
                                       'efficacy regret by person': list(out_metrics.eff_regret_by_person.mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean() / num_patients],
@@ -345,7 +346,7 @@ def main2(scenario, filepath):
     runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    folder_name = "c3t_more5"
+    folder_name = "c3t_more6"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),

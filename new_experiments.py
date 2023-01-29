@@ -492,7 +492,7 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
         selected_dose = 0
     return selected_dose, tox_acqui, eff_ei
 
-def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
+def select_final_dose(dose_scenario, num_subgroups, num_doses, dose_labels, x_test, max_doses,
                       tox_posteriors, eff_posteriors, 
                       tox_thre, eff_thre, tox_weight, eff_weight, final_beta_param, use_thall=False):
     x_mask = np.isin(x_test, dose_labels)
@@ -501,6 +501,11 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
         
     # Select dose with highest utility that is below toxicity threshold
     for subgroup_idx in range(num_subgroups):
+        # Can only select dose that has been seen before
+        max_dose = max_doses[subgroup_idx]
+        available_dose_indices = np.arange(max_dose + 1)
+        available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
+
         # Determine safe dose set on posterior means
         tox_mean = tox_posteriors.mean[subgroup_idx, :][x_mask]
         tox_upper = tox_posteriors.upper[subgroup_idx, :][x_mask]
@@ -508,12 +513,14 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
 
         tox_conf_interval = tox_upper - tox_mean
         tox_ucb = tox_mean + (final_beta_param * tox_conf_interval)
-        dose_set_mask = tox_ucb <= tox_thre
+        safe_doses_mask = tox_ucb <= tox_thre
 
         gt_threshold = np.where(tox_ucb > tox_thre)[0]
         if gt_threshold.size:
             first_idx_above_threshold = gt_threshold[0]
-            dose_set_mask[first_idx_above_threshold:] = False
+            safe_doses_mask[first_idx_above_threshold:] = False
+
+        dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
         print(f"Dose set: {dose_set_mask}")
 
         # Calculate utilities
@@ -531,24 +538,28 @@ def select_final_dose(num_subgroups, num_doses, dose_labels, x_test,
         max_eff = eff_mean.max()
         max_eff_idx = np.where(eff_mean == max_eff)[0][-1]
 
-        if use_thall:
-            max_utility = thall_utilities.max()
-            max_util_idx = np.where(thall_utilities == max_utility)[0][-1]
-            final_utilities[subgroup_idx, :] = thall_utilities
-            
-        else:
-            max_utility = utilities.max()
-            max_util_idx = np.where(utilities == max_utility)[0][-1]
-            final_utilities[subgroup_idx, :] = utilities
+        max_util = utilities.max()
+        max_util_idx = np.where(utilities == max_util)[0][-1]
 
-        # If recommended dose is above eff threshold assign this dose, else assign no dose.
-        if eff_mean[max_util_idx] >= eff_thre: 
-            dose_rec[subgroup_idx] = max_util_idx
-        
-        else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
-            print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
-            if max_eff >= eff_thre:
-                dose_rec[subgroup_idx] = max_eff_idx
+        max_util_thall = thall_utilities.max()
+        max_util_thall_idx = np.where(thall_utilities == max_util_thall)[0][-1]
+
+        if use_thall:
+            if eff_mean[max_util_thall_idx] >= eff_thre and max_util_thall >= -0.1:
+                dose_rec[subgroup_idx] = max_util_thall_idx
+                final_utilities[subgroup_idx, :] = thall_utilities
+            # else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
+            #     print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
+            #     if max_eff >= eff_thre:
+            #         dose_rec[subgroup_idx] = max_eff_idx
+        else:
+            if eff_mean[max_util_idx] >= eff_thre and max_util >= 0.:
+                dose_rec[subgroup_idx] = max_util_idx
+                final_utilities[subgroup_idx, :] = utilities
+            # else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
+            #     print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
+            #     if max_eff >= eff_thre:
+            #         dose_rec[subgroup_idx] = max_eff_idx
     
     print(f"Final doses: {dose_rec}")
     return dose_rec, final_utilities
@@ -784,6 +795,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     x_train = torch.tensor(selected_dose_values, dtype=torch.float32)
     y_tox_train = torch.tensor(tox_outcomes, dtype=torch.float32)
     y_eff_train = torch.tensor(eff_outcomes, dtype=torch.float32)
+    x_test = torch.tensor(np_x_test, dtype=torch.float32)
 
     # Train model
     tox_runner = MultitaskClassificationRunner(num_latents, num_tasks,
@@ -805,8 +817,9 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                             x_test, num_confidence_samples, use_gpu)
 
     # Select final dose
-    final_selected_doses, final_utilities = select_final_dose(num_subgroups, num_doses, 
-                                                              dose_labels, x_test, y_tox_posteriors,
+    final_selected_doses, final_utilities = select_final_dose(dose_scenario, num_subgroups, num_doses, 
+                                                              dose_labels, x_test, max_doses,
+                                                              y_tox_posteriors,
                                                               y_eff_posteriors,
                                                               dose_scenario.toxicity_threshold,
                                                               dose_scenario.efficacy_threshold,

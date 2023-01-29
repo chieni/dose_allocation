@@ -403,13 +403,14 @@ class DoseFindingScenarios:
         dose_range = (0.05, 20.)
         eff_thre = 0.2
         tox_thre = 0.4
-        midpoint = (0.4, 0.35)
+        midpoint = (0.45, 0.25)
+       # midpoint = (0.35, 0.35)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.2,  0.27],
-                                   [0.05, 0.1, 0.15,  0.2,  0.27]])
+        toxicity_probs = np.array([[0.01, 0.05, 0.1,  0.15,  0.2],
+                                   [0.01, 0.05, 0.1,  0.15,  0.2]])
         efficacy_probs = np.array([[0.1, 0.2,  0.45, 0.6, 0.85],
                                    [0.1, 0.15,  0.2, 0.4, 0.55]])
         
@@ -1175,7 +1176,7 @@ class TrialPopulationScenarios:
 
 
 
-# scenario = DoseFindingScenarios.paper_example_15()
+# scenario = DoseFindingScenarios.paper_example_12()
 # scenario.plot_true_subgroup_curves()
 
 # scenario = DoseFindingScenarios.paper_example_5()
