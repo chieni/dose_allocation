@@ -12,6 +12,8 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
     folders = [folder_name for idx in range(len(servers))]
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
+        if idx < 7:
+            continue
         # Create an SSH client
         client = paramiko.SSHClient()
 
@@ -67,5 +69,5 @@ def combine_files(filepath):
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('tenth_pass', 'exp14', 100, 2)
-combine_files('tenth_pass')
+copy_files('eleventh_pass', 'exp15', 100, 2)
+combine_files('eleventh_pass')

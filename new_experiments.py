@@ -465,7 +465,7 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
     # print(f"Dose set: {safe_doses_mask}")
 
     ## Select optimal dose using EI of efficacy posteriors
-    tradeoff_param = 0.01
+    tradeoff_param = 0.1
     eff_stdev = np.sqrt(eff_variance)
     eff_opt = eff_mean.max()
     improvement = eff_mean - eff_opt - tradeoff_param
@@ -548,6 +548,16 @@ def select_final_dose(dose_scenario, num_subgroups, num_doses, dose_labels, x_te
             if eff_mean[max_util_thall_idx] >= eff_thre and max_util_thall >= -0.1:
                 dose_rec[subgroup_idx] = max_util_thall_idx
                 final_utilities[subgroup_idx, :] = thall_utilities
+            else:
+                # Try second highest utility
+                util_copy = np.copy(thall_utilities)
+                util_copy.sort()
+                second_max_util_thall = thall_utilities[-2]
+                second_max_util_idx = np.where(thall_utilities == second_max_util_thall)[0][-2]
+                if eff_mean[second_max_util_idx] >= eff_thre and second_max_util_thall >=-0.1:
+                    dose_rec[subgroup_idx] = second_max_util_idx
+                    final_utilities[subgroup_idx, :] = thall_utilities
+
             # else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
             #     print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
             #     if max_eff >= eff_thre:

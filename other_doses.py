@@ -72,6 +72,10 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
         grouped_util_frame = util_frame.groupby(['subgroup_idx']).mean()
         frames_list.append(grouped_util_frame)
 
+        max_doses = np.empty(num_subgroups)
+        for subgroup_idx in range(num_subgroups):
+            max_doses[subgroup_idx ] = selected_doses[subgroup_indices == subgroup_idx].max()
+
         if retrain_model:
             dose_labels = dose_scenario.dose_labels
             # Construct test data (works for all models)
@@ -111,7 +115,7 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 
             # Select final dose
             dose_rec[trial, :], final_utilities = select_final_dose(dose_scenario, num_subgroups, num_doses, 
-                                                                    dose_labels, x_test, y_tox_posteriors,
+                                                                    dose_labels, x_test, max_doses, y_tox_posteriors,
                                                                     y_eff_posteriors,
                                                                     dose_scenario.toxicity_threshold,
                                                                     dose_scenario.efficacy_threshold,
@@ -206,7 +210,7 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
 
 # dose_frame, util_frame = test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weight, use_thall, retrain_model)
 
-filepath = "results/tenth_pass"
+filepath = "results/eleventh_pass"
 use_thall = True
 retrain_model = True
 num_subgroups = 2

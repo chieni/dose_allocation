@@ -20,7 +20,7 @@ def _plot_gp_helper(ax, x_train, y_train, x_true, y_true, x_test, y_test,
 
 def _plot_gp_helper_utility(ax, x_test, utility, markevery):
     ax.plot(x_test, utility, 'gray', markevery=markevery, marker='o', label='Utility')
-    ax.set_ylim([0, 1.1])
+    ax.set_ylim([-2, 2])
 
 def plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices, num_subgroups,
             x_test, y_tox_dist, y_eff_dist, util_func, selected_dose, markevery, x_mask, filename, 
@@ -71,7 +71,7 @@ def _plot_gp_timestep_helper(ax, x_train, y_train, x_true, y_true, x_test, y_tes
 def _plot_gp_timestep_utility(ax, x_test, x_true, utility, selected_dose, markevery, x_mask):
     ax.plot(x_test, utility, 'gray', markevery=markevery, marker='o', label='Utility')
     ax.plot(x_true[selected_dose], utility[x_mask][selected_dose], 'r', marker='o')
-    ax.set_ylim([0, 1.1])
+    ax.set_ylim([-2, 2])
 
 def plot_gp_timestep(dose_scenario, x_train, y_tox_train, y_eff_train, subgroup_indices,
                      num_subgroups, x_test, y_tox_dist, y_eff_dist, 
