@@ -12,7 +12,7 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
     folders = [folder_name for idx in range(len(servers))]
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
-        if idx < 7:
+        if idx < 4:
             continue
         # Create an SSH client
         client = paramiko.SSHClient()
@@ -21,7 +21,7 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         # Connect to the server
-        client.connect(hostname=server_name, username='ic390', password='B!!')
+        client.connect(hostname=server_name, username='ic390', password='B!scuit3310!')
 
         # Create an SFTP client
         sftp = client.open_sftp()
@@ -69,5 +69,5 @@ def combine_files(filepath):
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('eleventh_pass', 'exp15', 100, 2)
-combine_files('eleventh_pass')
+copy_files('twelfth_pass', 'exp16', 100, 2)
+combine_files('twelfth_pass')

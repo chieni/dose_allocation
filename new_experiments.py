@@ -32,7 +32,8 @@ class DoseExperimentMetrics:
         self.final_selected_doses = final_selected_doses
         self.optimal_doses = dose_scenario.optimal_doses
         self.final_utilities = final_utilities
-
+        print("Dose experiment metrics")
+        print(self.final_utilities)
         # Calculate dose error
         optimal_dose_per_sample = np.array([self.optimal_doses[subgroup_idx] for subgroup_idx in subgroup_indices])
         dose_error = (selected_doses != optimal_dose_per_sample).astype(np.float32)
@@ -362,7 +363,8 @@ def select_dose_confidence_and_increasing(num_doses, max_dose, tox_mean, tox_upp
 
     tox_acqui = tox_ucb
     if use_lcb:
-        tox_acqui = tox_lcb
+        #tox_acqui = tox_lcb
+        tox_acqui = tox_mean
     
     safe_doses_mask = tox_acqui[x_mask] <= dose_scenario.toxicity_threshold
     gt_threshold = np.where(tox_acqui[x_mask] > dose_scenario.toxicity_threshold)[0]
@@ -534,6 +536,7 @@ def select_final_dose(dose_scenario, num_subgroups, num_doses, dose_labels, x_te
         eff_mean[~dose_set_mask] = -np.inf
         utilities[~dose_set_mask] = -np.inf
         thall_utilities[~dose_set_mask] = -np.inf
+        print(thall_utilities)
 
         max_eff = eff_mean.max()
         max_eff_idx = np.where(eff_mean == max_eff)[0][-1]
@@ -545,33 +548,34 @@ def select_final_dose(dose_scenario, num_subgroups, num_doses, dose_labels, x_te
         max_util_thall_idx = np.where(thall_utilities == max_util_thall)[0][-1]
 
         if use_thall:
+            final_utilities[subgroup_idx, :] = thall_utilities
             if eff_mean[max_util_thall_idx] >= eff_thre and max_util_thall >= -0.1:
                 dose_rec[subgroup_idx] = max_util_thall_idx
-                final_utilities[subgroup_idx, :] = thall_utilities
             else:
                 # Try second highest utility
                 util_copy = np.copy(thall_utilities)
                 util_copy.sort()
                 second_max_util_thall = thall_utilities[-2]
-                second_max_util_idx = np.where(thall_utilities == second_max_util_thall)[0][-2]
+                second_max_util_idx = np.where(thall_utilities == second_max_util_thall)[0][-1]
                 if eff_mean[second_max_util_idx] >= eff_thre and second_max_util_thall >=-0.1:
                     dose_rec[subgroup_idx] = second_max_util_idx
-                    final_utilities[subgroup_idx, :] = thall_utilities
 
             # else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
             #     print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
             #     if max_eff >= eff_thre:
             #         dose_rec[subgroup_idx] = max_eff_idx
         else:
+            final_utilities[subgroup_idx, :] = utilities
             if eff_mean[max_util_idx] >= eff_thre and max_util >= 0.:
                 dose_rec[subgroup_idx] = max_util_idx
-                final_utilities[subgroup_idx, :] = utilities
+                
             # else: # Try assiging dose with highest efficacy in safe range. Else assign no dose
             #     print("Best dose has efficacy that is too low. Try assigning dose w/ highest efficacy.")
             #     if max_eff >= eff_thre:
             #         dose_rec[subgroup_idx] = max_eff_idx
     
     print(f"Final doses: {dose_rec}")
+    print(final_utilities)
     return dose_rec, final_utilities
     
 

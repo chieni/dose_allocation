@@ -42,7 +42,6 @@ class DoseFindingScenario:
         '''
         p = symbols('p')
         expr = ((midpoint[1]/tox_threshold)**p + ((1. - midpoint[0]) / (1. - eff_threshold))**p)**(1./p)
-        print(expr)
         sol = nsolve(expr - 1, 2)
         return sol
 
@@ -323,16 +322,16 @@ class DoseFindingScenarios:
         '''
         tox_model, tox_model2, eff_model = None, None, None
         dose_range = (0.05, 20.)
-        eff_thre = 0.2
+        eff_thre = 0.25
         tox_thre = 0.35
-        midpoint = (0.35, 0.3)
+        midpoint = (0.3, 0.25)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.1, 0.2, 0.4,  0.6,  0.9],
-                                   [0.1, 0.2, 0.4,  0.6,  0.9]])
-        efficacy_probs = np.array([[0.25, 0.4,  0.55, 0.65, 0.75],
+        toxicity_probs = np.array([[0.1, 0.2, 0.45,  0.6,  0.7],
+                                   [0.1, 0.2, 0.45,  0.6,  0.7]])
+        efficacy_probs = np.array([[0.3, 0.45,  0.6, 0.7, 0.8],
                                    [0.01, 0.15,  0.3, 0.4, 0.5]])
         
         optimal_doses = np.array([1, 5])
@@ -376,14 +375,15 @@ class DoseFindingScenarios:
         tox_model, tox_model2, eff_model = None, None, None
         dose_range = (0.05, 20.)
         eff_thre = 0.15
-        tox_thre = 0.6
-        midpoint = (0.35, 0.55)
+        tox_thre = 0.5
+        # midpoint = (0.35, 0.55)
+        midpoint = (0.35, 0.3)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.25,  0.6],
-                                   [0.05, 0.1, 0.15,  0.25,  0.6]])
+        toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.2,  0.5],
+                                   [0.05, 0.1, 0.15,  0.2,  0.5]])
         efficacy_probs = np.array([[0.01, 0.2, 0.4, 0.6, 0.4],
                                    [0.2, 0.4,  0.6, 0.4, 0.01]])
         
@@ -428,17 +428,23 @@ class DoseFindingScenarios:
         '''
         tox_model, tox_model2, eff_model, p_param = None, None, None, None
         dose_range = (0.05, 20.)
+        # eff_thre = 0.2
+        # tox_thre = 0.6
+        # midpoint = (0.4, 0.45)
         eff_thre = 0.2
-        tox_thre = 0.6
-        midpoint = (0.4, 0.45)
+        tox_thre = 0.4
+        midpoint = (0.45, 0.25)
+
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.1, 0.2, 0.35,  0.5,  0.65],
-                                   [0.1, 0.2, 0.35,  0.5,  0.65]])
-        efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.62, 0.64],
-                                   [0.4, 0.6,  0.62, 0.64, 0.66]])
+        # toxicity_probs = np.array([[0.1, 0.2, 0.35,  0.5,  0.65],
+        #                            [0.1, 0.2, 0.35,  0.5,  0.65]])
+        toxicity_probs = np.array([[0.1, 0.15, 0.2,  0.25,  0.4],
+                                   [0.1, 0.15, 0.2,  0.25,  0.4]])
+        efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.61, 0.62],
+                                   [0.4, 0.6,  0.61, 0.62, 0.63]])
         
         optimal_doses = np.array([2, 1])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
@@ -454,17 +460,17 @@ class DoseFindingScenarios:
         '''
         tox_model, tox_model2, eff_model, p_param = None, None, None, None
         dose_range = (0.05, 20.)
-        eff_thre = 0.15
-        tox_thre = 0.3
-        midpoint = (0.25, 0.25)
+        eff_thre = 0.2
+        tox_thre = 0.35
+        midpoint = (0.4, 0.3)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.05, 0.2, 0.35,  0.45,  0.6],
-                                   [0.25, 0.4, 0.55,  0.65,  0.8]])
-        efficacy_probs = np.array([[0.1, 0.25,  0.3, 0.45, 0.6],
-                                   [0.1, 0.25,  0.3, 0.45, 0.6]])
+        toxicity_probs = np.array([[0.01, 0.2, 0.5,  0.7,  0.8],
+                                   [0.25, 0.45, 0.75,  0.95,  1.0]])
+        efficacy_probs = np.array([[0.05, 0.35,  0.55, 0.65, 0.75],
+                                   [0.05, 0.35,  0.55, 0.65, 0.75]])
         
         optimal_doses = np.array([1, 5])
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
@@ -481,13 +487,13 @@ class DoseFindingScenarios:
         tox_model, tox_model2, eff_model = None, None, None
         dose_range = (0.05, 20.)
         eff_thre = 0.15
-        tox_thre = 0.6
-        midpoint = (0.5, 0.5)
+        tox_thre = 0.4
+        midpoint = (0.4, 0.25)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        toxicity_probs = np.array([[0.2, 0.3, 0.4,  0.5,  0.65],
-                                   [0.1, 0.2, 0.3, 0.4, 0.55]])
+        toxicity_probs = np.array([[0.15, 0.2, 0.25,  0.35,  0.6],
+                                   [0.05, 0.1, 0.15, 0.25, 0.5]])
         efficacy_probs = np.array([[0.2, 0.4,  0.6, 0.63, 0.65],
                                    [0.2, 0.4,  0.6, 0.63, 0.65]])
         
@@ -1176,7 +1182,7 @@ class TrialPopulationScenarios:
 
 
 
-# scenario = DoseFindingScenarios.paper_example_6()
+# scenario = DoseFindingScenarios.paper_example_3()
 # scenario.plot_true_subgroup_curves()
 
 # scenario = DoseFindingScenarios.paper_example_5()

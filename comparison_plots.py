@@ -137,7 +137,7 @@ def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename):
 
 folder_name = "eleventh_pass"
 dose_filename = f"results/{folder_name}/final_dose_error.csv"
-thall_filename = f"results/{folder_name}/thall_final_dose_error.csv"
+thall_filename = f"results/{folder_name}/thall_final_dose_error_retrain.csv"
 safety_filename = f"results/{folder_name}/safety_violations.csv"
 tox_filename = f"results/{folder_name}/tox_outcome.csv"
 eff_filename = f"results/{folder_name}/eff_outcome.csv"
@@ -145,9 +145,9 @@ utility_filename = f"results/{folder_name}/test_thall_utility.csv"
 
 c3t_folder_name = "c3t_more6"
 
-#dose_error_plot(c3t_folder_name, thall_filename)
+dose_error_plot(c3t_folder_name, thall_filename)
 #safety_plot(c3t_folder_name, safety_filename)
 #utility_plot(c3t_folder_name, utility_filename)
 #tox_plot(c3t_folder_name, tox_filename)
 #eff_plot(c3t_folder_name, eff_filename)
-tox_eff_plot(c3t_folder_name, tox_filename, eff_filename)
+# tox_eff_plot(c3t_folder_name, tox_filename, eff_filename)
