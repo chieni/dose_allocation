@@ -31,8 +31,8 @@ def test_select_final_dose_method(filepath, dose_scenario, tox_weight, eff_weigh
     num_tasks = 2
     tox_lengthscale_init = 4.
     eff_lengthscale_init = 2.
-    tox_mean_init = 0.
-    eff_mean_init = 0.
+    tox_mean_init = -0.2
+    eff_mean_init = -0.1
     num_epochs = 300
     learning_rate = 0.01
     use_gpu = False

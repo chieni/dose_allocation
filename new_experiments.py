@@ -987,7 +987,7 @@ if __name__ == "__main__":
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    learning_rate = 0.01
+    learning_rate = 0.005
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
