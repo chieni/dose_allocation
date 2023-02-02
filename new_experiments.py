@@ -957,7 +957,8 @@ def parse_args():
         15: DoseFindingScenarios.paper_example_15(),
         16: DoseFindingScenarios.paper_example_16(),
         17: DoseFindingScenarios.paper_example_17(),
-        18: DoseFindingScenarios.paper_example_18()
+        18: DoseFindingScenarios.paper_example_18(),
+        19: DoseFindingScenarios.paper_example_19()
     }
 
     filepath = args.filepath
@@ -987,7 +988,7 @@ if __name__ == "__main__":
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    learning_rate = 0.01
+    learning_rate = 0.005
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
