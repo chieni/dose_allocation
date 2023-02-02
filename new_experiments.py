@@ -931,6 +931,7 @@ def parse_args():
     parser.add_argument("--eff_lengthscale", type=float, help="Eff GP Kernel lengthscale")
     parser.add_argument("--tox_mean", type=float, help="Tox mean constant")
     parser.add_argument("--eff_mean", type=float, help="Eff mean constant")
+    parser.add_argument("--learning_rate", type=float, help="Learning rate")
     parser.add_argument("--num_latents", type=int, help="Number of GP latents")
     parser.add_argument("--use_lcb_init", action="store_true", help="Use LCB for initial stage.")
     parser.add_argument("--use_lcb_exp", action="store_true", help="Use LCB for exploitation stage.")
@@ -969,6 +970,7 @@ def parse_args():
     eff_lengthscale = args.eff_lengthscale
     tox_mean = args.tox_mean
     eff_mean = args.eff_mean
+    learning_rate = args.learning_rate
     num_latents = args.num_latents
     use_lcb_init = args.use_lcb_init
     use_lcb_exp = args.use_lcb_exp
@@ -976,19 +978,18 @@ def parse_args():
     use_thall = args.use_thall
     run_one = args.run_one
     return filepath, scenarios[scenario], beta_param, sampling_timesteps,\
-           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one
+           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one
 
 
 if __name__ == "__main__":
     filepath, dose_scenario, beta_param, sampling_timesteps, tox_lengthscale_init, \
-        eff_lengthscale_init, tox_mean_init, eff_mean_init, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one = parse_args()
+        eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one = parse_args()
 
     increase_beta_param = False
     use_utility = False
     use_gpu = False
     num_trials = 100
     num_samples = 51
-    learning_rate = 0.005
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
