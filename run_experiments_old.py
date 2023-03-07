@@ -346,7 +346,7 @@ def main2(scenario, filepath):
     runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    folder_name = "c3t_more9"
+    folder_name = "c3t_more10"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),
@@ -365,7 +365,8 @@ if __name__ == "__main__":
         15: DoseFindingScenarios.paper_example_15(),
         16: DoseFindingScenarios.paper_example_16(),
         17: DoseFindingScenarios.paper_example_17(),
-        18: DoseFindingScenarios.paper_example_18()
+        18: DoseFindingScenarios.paper_example_18(),
+        19: DoseFindingScenarios.paper_example_19()
     }
 
     for idx, scenario in scenarios.items():

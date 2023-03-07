@@ -81,6 +81,63 @@ class DoseFindingScenario:
         plt.ylabel('Response')
         plt.legend()
         plt.show()
+    
+    def plot_paper_subgroup_curves(self, scenario_idx):
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(4, 4))
+
+        plt.plot(self.dose_labels, self.toxicity_probs[0, :], marker='o', color='tab:green')
+        plt.plot(self.dose_labels, self.toxicity_probs[1, :], marker='o', color='tab:pink')
+        plt.plot(self.dose_labels, np.repeat(self.toxicity_threshold, len(self.dose_labels)), 'k')
+        if self.optimal_doses[0] != 5:
+            plt.plot(self.dose_labels[self.optimal_doses[0]], self.toxicity_probs[0, :][self.optimal_doses[0]], 'r', marker='o')
+        if self.optimal_doses[1] != 5:
+            plt.plot(self.dose_labels[self.optimal_doses[1]], self.toxicity_probs[1, :][self.optimal_doses[1]], color='mediumblue', marker='o')
+
+        plt.xlabel(None)
+        plt.ylabel(None)
+        plt.xlim(1.5, 16)
+        plt.ylim(-0.1, 1)
+        plt.legend([],[], frameon=False)
+        plt.tick_params(
+            axis='both',         # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            labelbottom=False, # labels along the bottom edge are off
+            left=False,
+            labelleft=False
+        )
+        plt.savefig(f"results/scenario_figs/tox_{scenario_idx}", bbox_inches="tight", pad_inches=0, dpi=300)
+        plt.close()
+
+        sns.set_style("whitegrid")
+        plt.figure(figsize=(4, 4))
+
+        plt.plot(self.dose_labels, self.efficacy_probs[0, :], marker='o', color='tab:green')
+        plt.plot(self.dose_labels, self.efficacy_probs[1, :], marker='o', color='tab:pink')
+        plt.plot(self.dose_labels, np.repeat(self.efficacy_threshold, len(self.dose_labels)), 'k')
+        if self.optimal_doses[0] != 5:
+            plt.plot(self.dose_labels[self.optimal_doses[0]], self.efficacy_probs[0, :][self.optimal_doses[0]], 'r', marker='o')
+        if self.optimal_doses[1] != 5:
+            plt.plot(self.dose_labels[self.optimal_doses[1]], self.efficacy_probs[1, :][self.optimal_doses[1]], color='mediumblue', marker='o')
+
+        plt.xlabel(None)
+        plt.ylabel(None)
+        plt.xlim(1.5, 16)
+        plt.ylim(-0.1, 1)
+        plt.legend([],[], frameon=False)
+        plt.tick_params(
+            axis='both',         # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            labelbottom=False, # labels along the bottom edge are off
+            left=False,
+            labelleft=False
+        )
+        plt.savefig(f"results/scenario_figs/eff_{scenario_idx}", bbox_inches="tight", pad_inches=0, dpi=300)
+        plt.close()
 
     def plot_subgroup_curves(self):
         sns.set()
@@ -757,20 +814,14 @@ class DoseFindingScenarios:
         dose_range = (0.05, 20.)
         eff_thre = 0.2
         tox_thre = 0.4
-        midpoint = (0.45, 0.25)
-       # midpoint = (0.35, 0.35)
+        # midpoint = (0.4, 0.2)
+        midpoint = (0.35, 0.35)
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
 
 
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
         toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.2,  0.25],
                                    [0.05, 0.1, 0.15,  0.2,  0.25]])
-
-        # toxicity_probs = np.array([[0.05, 0.1, 0.15,  0.175,  0.2],
-        #                            [0.05, 0.1, 0.15,  0.175,  0.2]])
-
-        # toxicity_probs = np.array([[0.01, 0.02, 0.05,  0.07,  0.1],
-        #                            [0.01, 0.02, 0.05,  0.07,  0.1]])
         efficacy_probs = np.array([[0.1, 0.2,  0.45, 0.6, 0.85],
                                    [0.1, 0.15,  0.2, 0.4, 0.55]])
         
@@ -1233,9 +1284,32 @@ class TrialPopulationScenarios:
 
 
 
-# scenario = DoseFindingScenarios.paper_example_3()
-# scenario.plot_true_subgroup_curves()
+scenarios = {
+    1: DoseFindingScenarios.paper_example_1(),
+    2: DoseFindingScenarios.paper_example_2(),
+    3: DoseFindingScenarios.paper_example_3(),
+    4: DoseFindingScenarios.paper_example_4(),
+    5: DoseFindingScenarios.paper_example_5(),
+    6: DoseFindingScenarios.paper_example_6(),
+    7: DoseFindingScenarios.paper_example_7(),
+    8: DoseFindingScenarios.paper_example_8(),
+    9: DoseFindingScenarios.paper_example_9(),
+    10: DoseFindingScenarios.paper_example_10(),
+    11: DoseFindingScenarios.paper_example_11(),
+    12: DoseFindingScenarios.paper_example_12(),
+    13: DoseFindingScenarios.paper_example_13(),
+    14: DoseFindingScenarios.paper_example_14(),
+    15: DoseFindingScenarios.paper_example_15(),
+    16: DoseFindingScenarios.paper_example_16(),
+    17: DoseFindingScenarios.paper_example_17(),
+    18: DoseFindingScenarios.paper_example_18(),
+    19: DoseFindingScenarios.paper_example_19()
+}
 
+for key, scenario in scenarios.items():
+    scenario.plot_paper_subgroup_curves(key)
+
+# scenario.plot_true_subgroup_curves()
 # scenario = DoseFindingScenarios.paper_example_5()
 # tox_thre = scenario.toxicity_threshold
 # eff_thre = scenario.efficacy_threshold

@@ -926,6 +926,7 @@ def parse_args():
     parser.add_argument("--filepath", type=str, help="File path name")
     parser.add_argument("--scenario", type=int, help="Dose scenario")
     parser.add_argument("--beta_param", type=float, help="Beta param for toxicity confidence interval.")
+    parser.add_argument("--num_samples", type=int, help="Number of samples.")
     parser.add_argument("--sampling_timesteps", type=int, help="Number of timesteps to run burn-in procedure.")
     parser.add_argument("--tox_lengthscale", type=float, help="Tox GP Kernel lengthscale.")
     parser.add_argument("--eff_lengthscale", type=float, help="Eff GP Kernel lengthscale")
@@ -965,6 +966,7 @@ def parse_args():
     filepath = args.filepath
     scenario = args.scenario
     beta_param = args.beta_param
+    num_samples = args.num_samples
     sampling_timesteps = args.sampling_timesteps
     tox_lengthscale = args.tox_lengthscale
     eff_lengthscale = args.eff_lengthscale
@@ -977,19 +979,18 @@ def parse_args():
     set_lmc = args.set_lmc
     use_thall = args.use_thall
     run_one = args.run_one
-    return filepath, scenarios[scenario], beta_param, sampling_timesteps,\
+    return filepath, scenarios[scenario], beta_param, num_samples, sampling_timesteps,\
            tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one
 
 
 if __name__ == "__main__":
-    filepath, dose_scenario, beta_param, sampling_timesteps, tox_lengthscale_init, \
+    filepath, dose_scenario, beta_param, num_samples, sampling_timesteps, tox_lengthscale_init, \
         eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one = parse_args()
 
     increase_beta_param = False
     use_utility = False
     use_gpu = False
     num_trials = 100
-    num_samples = 51
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
