@@ -1306,8 +1306,8 @@ scenarios = {
     19: DoseFindingScenarios.paper_example_19()
 }
 
-for key, scenario in scenarios.items():
-    scenario.plot_paper_subgroup_curves(key)
+# for key, scenario in scenarios.items():
+#     scenario.plot_paper_subgroup_curves(key)
 
 # scenario.plot_true_subgroup_curves()
 # scenario = DoseFindingScenarios.paper_example_5()

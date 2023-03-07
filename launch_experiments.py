@@ -10,18 +10,18 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # Connect to the remote server
-    ssh.connect(hostname=hostname, username='ic390', password='B!!')
+    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
 
     # Run a command 
     exp_command = get_command(exp_name, scenario_num, num_samples, sampling_timesteps)
     print(exp_command)
-    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n nohup {exp_command} >/dev/null 2>&1' ")
-    
+    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n git stash \n git pull \n cd dose_allocation \n nohup {exp_command} >/dev/null 2>&1' ")
+    # >/dev/null 2>&1
     count = 0
-    for line in iter(stdout.readline, ""):
+    for line in iter(stderr.readline, ""):
         print(line, end="")
         count += 1
-        if count > 20:
+        if count > 30:
             break
 
     ssh.close()
