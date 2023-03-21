@@ -131,11 +131,9 @@ class DoseFindingModel:
 
             # If the recommended dose is above efficacy threshold, dose rec is correct, assign to rec
             if max_dose_val >= eff_thre:
-                self.metrics.rec[s, max_dose_idx] = 1
-
+                pass
             # If recommended dose is not above efficacy threshold, assign no dose to rec
             else:
-                self.metrics.rec[s, self.num_doses] = 1
                 max_dose_idx = self.num_doses
 
             if max_dose_idx != opt_ind[s]:

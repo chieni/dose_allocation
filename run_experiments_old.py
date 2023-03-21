@@ -325,9 +325,7 @@ def main():
     #runner.run_one_param(TanhModel, a0)
     runner.run_one_param(OGTanhModel, a0)
 
-def main2(scenario, filepath):
-    reps = 1000 # num of simulated trials
-    num_patients = 51
+def main2(scenario, num_patients, reps, filepath):
     learning_rate = 0.01
 
     num_subgroups = scenario.num_subgroups
@@ -346,7 +344,7 @@ def main2(scenario, filepath):
     runner.run_one_param(OGTanhModel, a0, filepath)
 
 if __name__ == "__main__":
-    folder_name = "c3t_more10"
+    folder_name = "c3t_num_sample3"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),
@@ -369,12 +367,22 @@ if __name__ == "__main__":
         19: DoseFindingScenarios.paper_example_19()
     }
 
-    for idx, scenario in scenarios.items():
-        filepath = f"results/{folder_name}/scenario{idx}"
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        main2(scenario, filepath)
+    # for idx, scenario in scenarios.items():
+    #     filepath = f"results/{folder_name}/scenario{idx}"
+    #     if not os.path.exists(filepath):
+    #         os.makedirs(filepath)
+    #     main2(scenario, filepath)
 
     # scenario = DoseFindingScenarios.paper_example_9()
     # filepath = "results/116_example"
-    # main2(scenario, filepath)
+    # main2(scenario, 51, filepath)
+    num_trials = 100
+    test_sample_nums = np.arange(51, 1000, 9)
+    scenario_idx = 9 # scenario 9
+    scenario = scenarios[scenario_idx]
+    for num_samples in test_sample_nums:
+        filepath = f"results/{folder_name}/num_samples{num_samples}"
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        print(f"Num samples: {num_samples}")
+        main2(scenario, num_samples, num_trials, filepath)

@@ -1,10 +1,11 @@
 import pandas as pd
 
-filepath = "results/c3t_more10"
+filepath = "results/c3t_num_sample2"
 num_scenarios = 18
 frames = []
 for scenario in range(1, num_scenarios+1):
-    frame = pd.read_csv(f"{filepath}/scenario{scenario}/metrics_fram.csv", index_col=0).T
+    # frame = pd.read_csv(f"{filepath}/scenario{scenario}/metrics_fram.csv", index_col=0).T
+    frame = pd.read_csv(f"{filepath}/num_samples{scenario}/metrics_fram.csv", index_col=0).T
     frames.append(frame)
 
 metrics = ['safety violations', 'utility', 'thall_utility', 'dose error by person',

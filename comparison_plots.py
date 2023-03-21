@@ -2,9 +2,13 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+import numpy as np
 
-def dose_error_plot(c3t_folder_name, gp_filename, folder_name):
-    c3t_filename = f"results/{c3t_folder_name}/final dose error.csv"
+
+def dose_error_plot(three_filename, c3t_filename, gp_filename, out_filename):
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
+    three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
@@ -14,7 +18,7 @@ def dose_error_plot(c3t_folder_name, gp_filename, folder_name):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt, three_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -37,10 +41,12 @@ def dose_error_plot(c3t_folder_name, gp_filename, folder_name):
         left=False,
         labelleft=False
     )
-    plt.savefig(f"{folder_name}/dose_error_comparison_plot.png", bbox_inches="tight", pad_inches=0, dpi=500)
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=500)
 
-def safety_plot(c3t_folder_name, gp_filename, folder_name):
-    c3t_filename = f"results/{c3t_folder_name}/safety violations.csv"
+def safety_plot(three_filename, c3t_filename, gp_filename, out_filename):
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
+    three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
@@ -50,7 +56,7 @@ def safety_plot(c3t_folder_name, gp_filename, folder_name):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt, three_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -76,7 +82,7 @@ def safety_plot(c3t_folder_name, gp_filename, folder_name):
         left=False,
         labelleft=False
     )
-    plt.savefig(f"{folder_name}/safety_comparison_plot.png", bbox_inches="tight", pad_inches=0, dpi=300)
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
 
 def tox_plot(c3t_folder_name, gp_filename, folder_name):
     c3t_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
@@ -119,8 +125,10 @@ def eff_plot(c3t_folder_name, gp_filename, folder_name):
     sns.pointplot(data=frame, x='scenario', y='efficacy', hue='method', join=False)
     plt.savefig(f"{folder_name}/eff_comparison_plot.png", dpi=300)
 
-def utility_plot(c3t_folder_name, gp_filename, folder_name):
-    c3t_filename = f"results/{c3t_folder_name}/thall_utility.csv"
+def utility_plot(three_filename, c3t_filename, gp_filename, out_filename):
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
+    three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
@@ -130,7 +138,7 @@ def utility_plot(c3t_folder_name, gp_filename, folder_name):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt, three_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     sns.set_style("whitegrid")
@@ -139,7 +147,7 @@ def utility_plot(c3t_folder_name, gp_filename, folder_name):
     # fig = sns.pointplot(data=frame, x='scenario', y='utility', hue='method', join=False)
     # fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 17.5), ylim=(-0.1, 1.0))
     fig = sns.pointplot(data=frame, x='utility', y='scenario', hue='method', capsize=0.4, errwidth=2.0, scale=0.9, join=False)
-    fig.set(xlabel=None, ylabel=None, xlim=(-1.0, 1.0), ylim=(-0.5, 17.5))
+    fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 0.5), ylim=(-0.5, 17.5))
 
     plt.legend([],[], frameon=False)
     plt.tick_params(
@@ -151,7 +159,7 @@ def utility_plot(c3t_folder_name, gp_filename, folder_name):
         left=False,
         labelleft=False
     )
-    plt.savefig(f"{folder_name}/utility_comparison_plot.png", bbox_inches="tight", pad_inches=0, dpi=300)
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
 
 def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename, folder_name):
     c3t_tox_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
@@ -226,20 +234,54 @@ def tox_eff_diff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename, folder_
 def util_with_thall(c3t_folder_name, gp_filename, folder_name):
     pass
 
+
+
+def sample_size_plot(c3t_filename, gp_filename):
+    sns.set()
+    c3t_frame = pd.read_csv(c3t_filename, index_col=0)
+    c3t_frame.columns = np.arange(51, 205, 9)
+    c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+    c3t_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
+    c3t_melt['method'] = 'c3t'
+
+    gp_frame = pd.read_csv(gp_filename, index_col=0)
+    gp_frame.columns = np.arange(51, 205, 9)
+    gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+    gp_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
+    gp_melt['method'] = 'gp'
+
+    frame = pd.concat([c3t_melt, gp_melt])
+    frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
+    sns.lineplot(data=frame, x='sample_size', y='dose_error', style='index', hue='method')
+    plt.show()
+
+
+
 folder_name = "nineteenth_pass"
 dose_filename = f"results/{folder_name}/final_dose_error.csv"
 thall_filename = f"results/{folder_name}/thall_final_dose_error_retrain.csv"
 safety_filename = f"results/{folder_name}/safety_violations.csv"
 tox_filename = f"results/{folder_name}/tox_outcome.csv"
 eff_filename = f"results/{folder_name}/eff_outcome.csv"
-utility_filename = f"results/{folder_name}/utility.csv"
+utility_filename = f"results/{folder_name}/thall_utilities.csv"
 
 c3t_folder_name = "c3t_more10"
 
-safety_plot(c3t_folder_name, safety_filename, f"results/{folder_name}")
-dose_error_plot(c3t_folder_name, dose_filename, f"results/{folder_name}")
+# safety_plot(f"results/{c3t_folder_name}/safety violations.csv", safety_filename, f"results/{folder_name}")
+# dose_error_plot(f"results/{c3t_folder_name}/final dose error.csv", dose_filename, f"results/{folder_name}")
 # tox_plot(c3t_folder_name, tox_filename, f"results/{folder_name}")
 # eff_plot(c3t_folder_name, eff_filename, f"results/{folder_name}")
-utility_plot(c3t_folder_name, utility_filename, f"results/{folder_name}")
+# utility_plot(f"results/{c3t_folder_name}/thall_utility.csv", utility_filename, f"results/{folder_name}")
 # tox_eff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 # tox_eff_diff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
+
+#sample_size_plot("results/c3t_num_sample2/final dose error.csv", "results/num_samples_exp2/final_dose_error.csv")
+#sample_size_plot("results/c3t_num_sample2/utility.csv", "results/num_samples_exp2/utility.csv")
+
+
+# dose_error_plot(f"results/threeplusexp/final_ose_error.csv", f"results/{c3t_folder_name}/final dose error.csv",
+#                 dose_filename, f"results/{folder_name}/all_dose_error_comparison_plot.png")
+# safety_plot(f"results/threeplusexp/safety.csv", f"results/{c3t_folder_name}/safety violations.csv",
+#             safety_filename, f"results/{folder_name}/all_safety_comparison_plot.png")
+# utility_plot(f"results/threeplusexp/utility.csv", f"results/{c3t_folder_name}/thall_utility.csv",
+#              utility_filename, f"results/{folder_name}/all_utility_comparison_plot.png")

@@ -15,14 +15,14 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
     # Run a command 
     exp_command = get_command(exp_name, scenario_num, num_samples, sampling_timesteps)
     print(exp_command)
-    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n git stash \n git pull \n cd dose_allocation \n nohup {exp_command} >/dev/null 2>&1' ")
+    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {exp_command} >/dev/null 2>&1' ")
     # >/dev/null 2>&1
-    count = 0
-    for line in iter(stderr.readline, ""):
-        print(line, end="")
-        count += 1
-        if count > 30:
-            break
+    # count = 0
+    # for line in iter(stderr.readline, ""):
+    #     print(line, end="")
+    #     count += 1
+    #     if count > 30:
+    #         break
 
     ssh.close()
 
@@ -43,7 +43,7 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
         '4.236.170.149','4.236.170.103', '172.174.224.64']
 
 
-launch_experiment('172.174.178.62', 'exp24', 9, 51, 18)
+# launch_experiment('172.174.178.62', 'exp24', 9, 51, 18)
 
 # For all scenarios
 # for idx, server in enumerate(servers):
@@ -55,8 +55,12 @@ launch_experiment('172.174.178.62', 'exp24', 9, 51, 18)
 # sampling_timesteps = 18 
 
 # test_sample_nums = np.arange(51, 223, 9)
-# scenario_idx = 9 # scenario 9
-# for idx, num_samples in enumerate(test_sample_nums):
-#     server = servers[idx]
-#     sampling_timesteps = 18 + (idx * 3)
-#     launch_experiment(server, 'exp_sample_size', scenario_idx, num_samples, sampling_timesteps)
+
+test_sample_nums = np.arange(204, 376, 9)
+scenario_idx = 9 # scenario 9
+for idx, num_samples in enumerate(test_sample_nums):
+    server = servers[idx]
+    #sampling_timesteps = 18 + (idx * 3)
+    sampling_timesteps = int((18/51) * num_samples)
+    print(num_samples, sampling_timesteps)
+    launch_experiment(server, 'exp_sample_size3', scenario_idx, num_samples, sampling_timesteps)

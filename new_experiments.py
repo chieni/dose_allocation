@@ -46,11 +46,14 @@ class DoseExperimentMetrics:
                                        for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
         selected_eff_probs = np.array([dose_scenario.get_efficacy_prob(arm_idx, group_idx) \
                                        for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
-        utilities = calculate_utility(selected_tox_probs, selected_eff_probs,
-                                      dose_scenario.toxicity_threshold,
-                                      dose_scenario.efficacy_threshold,
-                                      dose_scenario.tox_weight,
-                                      dose_scenario.eff_weight)
+        # utilities = calculate_utility(selected_tox_probs, selected_eff_probs,
+        #                               dose_scenario.toxicity_threshold,
+        #                               dose_scenario.efficacy_threshold,
+        #                               dose_scenario.tox_weight,
+        #                               dose_scenario.eff_weight)
+        utilities = calculate_utility_thall(selected_tox_probs, selected_eff_probs,
+                                            dose_scenario.toxicity_threshold, dose_scenario.efficacy_threshold,
+                                            dose_scenario.p_param)
                                       
         # Calculate safety constraint violation
         safety_violations = np.array(selected_tox_probs > dose_scenario.toxicity_threshold, dtype=np.int32)

@@ -67,5 +67,5 @@ def combine_files(filepath):
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('nineteenth_pass', 'exp23', 100, 2)
-combine_files('nineteenth_pass')
+copy_files('exp_sample_size3', 'exp_sample_size3', 100, 2)
+# combine_files('num_samples_exp2')

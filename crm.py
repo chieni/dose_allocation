@@ -47,27 +47,26 @@ class CRM:
         y = np.concatenate([[0], y, [0]])
         return pm.Interpolated(param, x, y)
     
-    def plot_dose_toxicity_curve(dose_labels, p_true, alpha):
+    def plot_dose_toxicity_curve(dose_labels, p_true, alpha, num_subgroups):
         sns.set_theme()
         model_toxicities = CRM.tangent_model(dose_labels, alpha)
-        frame = pd.DataFrame({'dose_labels': dose_labels,
-                              'model': model_toxicities,
-                              'true': p_true.mean(axis=0)})
-        frame = pd.melt(frame, id_vars=['dose_labels'], var_name='toxicity', value_name='toxicity_value')
-        sns.lineplot(data=frame, x='dose_labels', y='toxicity_value', hue='toxicity', markers=True)
+        plt.plot(dose_labels, model_toxicities, 'b-', label="CRM")
+        for subgroup_idx in range(num_subgroups):
+            plt.plot(dose_labels, p_true[subgroup_idx, :], 'g-', label=f"Subgroup {subgroup_idx} True")
+        plt.show()
 
-    def run_trial(self, dose_scenario, patients):
+    def run_trial(self, dose_scenario, patients, num_subgroups):
         cohort_size = 3
         max_dose = 0
         timestep = 0
-        curr_s = patients[:cohort_size]
+        cohort_subgroup_indices = patients[:cohort_size].astype(int)
 
         # Assign first patient to lowest dose level
         self.allocated_doses[:cohort_size] = 0
         X = np.array([dose_scenario.dose_labels[0] for patient_idx in range(cohort_size)])
 
         # Sample toxicity
-        Y = np.array([int(dose_scenario.sample_toxicity_event(self.allocated_doses[timestep], subgroup_idx)) for subgroup_idx in curr_s])
+        Y = dose_scenario.generate_toxicity_data(self.allocated_doses[:cohort_size], cohort_subgroup_indices)
 
         model = pm.Model()
         with model:
@@ -78,75 +77,84 @@ class CRM:
             toxicity_prob = CRM.tangent_model(X, alpha)
 
             # Likelihood (sampling dist) of observations
-            Y_obs = pm.Bernoulli("Y_obs", toxicity_prob, observed=Y)
+            Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
-            # Draw 1000 posterior samples
-            trace = pm.sample(20000, cores=1, target_accept=0.95)
-            print(az.summary(trace, round_to=2))
+            # Draw posterior samples
+            # trace = pm.sample(20000, cores=1, target_accept=0.95)
+            trace = pm.sample(5000, chains=1)
+            alpha_trace = trace.posterior['alpha']
+            current_alpha_mean = np.mean(alpha_trace).item()
 
-            current_alpha_dist = trace.posterior['alpha']
-            expected_toxicities = CRM.tangent_model(dose_scenario.dose_labels, 1. / np.e)
-            print(expected_toxicities)
-            # CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_dist.values.mean())
+            predicted_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_mean)
+            print(predicted_toxicities)
+            print(f"True tox: {dose_scenario.toxicity_probs}")
+
+            # CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_mean)
             # plt.show()
 
         timestep += cohort_size
 
         while timestep < self.num_patients:
             # Sample more data
-            curr_s = patients[timestep - cohort_size:timestep]
-            print(f"curr_s: {curr_s}")
+            cohort_subgroup_indices = patients[timestep - cohort_size:timestep].astype(int)
+            print(f"curr_s: {cohort_subgroup_indices}")
 
-            # If skipping doses is allowed, assign to the dose whose expected toxicity
-            # under the posterior dist is closest to the threshold.
-            expected_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_dist.values.mean())
-            selected_dose = np.abs(np.array(expected_toxicities) - dose_scenario.toxicity_threshold).argmin()
+            predicted_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_mean)
+            selected_dose = np.abs(np.array(predicted_toxicities) - dose_scenario.toxicity_threshold).argmin()
             if selected_dose > max_dose + 1:
                 selected_dose = max_dose + 1
                 max_dose = selected_dose
-            print(expected_toxicities)
+            print(predicted_toxicities)
             print(f"Selected dose: {selected_dose}")
-            self.allocated_doses[:cohort_size] = selected_dose
+            self.allocated_doses[timestep:timestep + cohort_size] = selected_dose
+
             X = np.array([dose_scenario.dose_labels[selected_dose] for patient_idx in range(cohort_size)])
             # Sample toxicity
-            Y = np.array([int(dose_scenario.sample_toxicity_event(self.allocated_doses[timestep], subgroup_idx)) for subgroup_idx in curr_s])
+            Y = dose_scenario.generate_toxicity_data(self.allocated_doses[timestep:timestep + cohort_size], cohort_subgroup_indices)
             print(X, Y)
             model = pm.Model()
             with model:
                 # Priors are posteriors from previous iteration
-                alpha = CRM.from_posterior("alpha", trace.posterior["alpha"])
+                alpha = CRM.from_posterior("alpha", alpha_trace)
 
                 # Expected value of outcome: dose-toxicity model
                 toxicity_prob = CRM.tangent_model(X, alpha)
 
                 # Likelihood (sampling dist) of observations
-                Y_obs = pm.Bernoulli("Y_obs", toxicity_prob, observed=Y)
+                Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
-                # draw 10000 posterior samples
-                trace = pm.sample(20000, cores=1, target_accept=0.95)
-                    
-                print(az.summary(trace, round_to=2))
-                current_alpha_dist = trace.posterior['alpha']
-                print(current_alpha_dist.values.mean())
-                # CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_dist.values.mean())
+                # Draw posterior samples
+                # trace = pm.sample(20000, cores=1, target_accept=0.95)
+
+                trace = pm.sample(5000, chains=1)
+                alpha_trace = trace.posterior['alpha']
+                current_alpha_mean = np.mean(alpha_trace).item()
+                # print(az.summary(trace, round_to=2))
+
+                print(current_alpha_mean)
+                predicted_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_mean)
+                print(predicted_toxicities)
+
+                # CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_mean)
                 # plt.show()
 
             timestep += cohort_size
-        final_model_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_dist.values.mean())
+        final_model_toxicities = CRM.tangent_model(dose_scenario.dose_labels, current_alpha_mean)
         print(final_model_toxicities)
-        CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_dist.values.mean())
-        plt.show()
+        print(f"True tox: {dose_scenario.toxicity_probs}")
+        CRM.plot_dose_toxicity_curve(dose_scenario.dose_labels, dose_scenario.toxicity_probs, current_alpha_mean, num_subgroups)
 
 def main():
     # patient_scenario = TrialPopulationScenarios.lee_trial_population()
     # dose_scenario = DoseFindingScenarios.lee_synthetic_example()
 
-    dose_scenario = DoseFindingScenarios.oquigley_model_example()
+    # dose_scenario = DoseFindingScenarios.oquigley_model_example()
+    dose_scenario = DoseFindingScenarios.paper_example_1()
     patient_scenario = TrialPopulationScenarios.homogenous_population()
     num_patients = 12
     crm = CRM(num_patients)
     patients = patient_scenario.generate_samples(num_patients)
-    crm.run_trial(dose_scenario, patients)
+    crm.run_trial(dose_scenario, patients, patient_scenario.num_subgroups)
 
 
 
