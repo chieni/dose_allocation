@@ -898,8 +898,13 @@ class DoseFindingScenarios:
         dose_skeleton_labels = model.initialize_dose_label(dose_skeleton)
         dose_skeleton_labels = dose_skeleton_labels.astype(np.float32)
         optimal_doses = np.array([6, 3, 3])
+        midpoint = (0.4, 0.3)
+        tox_thre = 0.3
+        eff_thre = 0.2
+        p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
+
         return DoseFindingScenario(dose_skeleton_labels, toxicity_probs, efficacy_probs,
-                                   optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
+                                   optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2, p_param=p_param)
     
     '''
     Scenarios from James 2021

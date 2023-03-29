@@ -37,18 +37,18 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
             sftp.get(remote_file, local_file)
         
         # Download trial files
-        for trial in range(num_trials):
-            local_path = f"results/{out_folder_name}/scenario{idx+1}/trial{trial}"
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
-            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
-            for subgroup_idx in range(num_subgroups):
-                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
-                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
-                sftp.get(remote_file, local_file)
-            remote_file = f"{remote_path}/timestep_metrics.csv"
-            local_file = f"{local_path}/timestep_metrics.csv"
-            sftp.get(remote_file, local_file)
+        # for trial in range(num_trials):
+        #     local_path = f"results/{out_folder_name}/scenario{idx+1}/trial{trial}"
+        #     if not os.path.exists(local_path):
+        #         os.makedirs(local_path)
+        #     remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+        #     for subgroup_idx in range(num_subgroups):
+        #         remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+        #         local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+        #         sftp.get(remote_file, local_file)
+        #     remote_file = f"{remote_path}/timestep_metrics.csv"
+        #     local_file = f"{local_path}/timestep_metrics.csv"
+        #     sftp.get(remote_file, local_file)
 
         sftp.close()
         client.close()
@@ -67,5 +67,20 @@ def combine_files(filepath):
             metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('exp_sample_size3', 'exp_sample_size3', 100, 2)
-# combine_files('num_samples_exp2')
+def combine_files_sample_sizes(filepath):
+    filepath = f"results/{filepath}"
+    test_sample_nums = np.arange(51, 538, 9)
+    frames = []
+    for num_samples in test_sample_nums:
+        frame = pd.read_csv(f"{filepath}/num_samples{num_samples}/final_metric_means.csv", index_col=0)
+        frames.append(frame)
+    metrics = ['tox_outcome', 'eff_outcome', 'utility', 'safety_violations', 'dose_error', 'final_dose_error']
+    for metric in metrics:
+        metric_frame = pd.DataFrame(index=frames[0].index)
+        for idx, num_samples in enumerate(test_sample_nums):
+            metric_frame[num_samples] = frames[idx][metric].values
+        metric_frame.to_csv(f"{filepath}/{metric}.csv")
+
+# copy_files('exp_sample_size4', 'exp_sample_size4', 100, 2)
+# combine_files('exp_sample_size4')
+combine_files_sample_sizes('gp_sample_size')

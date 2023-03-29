@@ -236,21 +236,37 @@ def util_with_thall(c3t_folder_name, gp_filename, folder_name):
 
 
 
-def sample_size_plot(c3t_filename, gp_filename):
+def sample_size_plot(three_filename, c3t_filename, gp_filename):
+    test_sample_nums = np.arange(51, 538, 9).astype(int)
+
     sns.set()
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_frame.columns = three_frame.columns.astype(int)
+    three_frame = three_frame[test_sample_nums]
+    three_frame.columns = test_sample_nums
+
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+    three_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
+    three_melt['method'] = '3+3'
+
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
-    c3t_frame.columns = np.arange(51, 205, 9)
+    c3t_frame.columns = c3t_frame.columns.astype(int)
+    c3t_frame = c3t_frame[test_sample_nums]
+    c3t_frame.columns = test_sample_nums
+    
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
     c3t_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
     c3t_melt['method'] = 'c3t'
 
     gp_frame = pd.read_csv(gp_filename, index_col=0)
-    gp_frame.columns = np.arange(51, 205, 9)
+    gp_frame.columns = gp_frame.columns.astype(int)
+    gp_frame = gp_frame[test_sample_nums]
+    gp_frame.columns = test_sample_nums
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
     gp_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, c3t_melt, gp_melt])
     frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
     sns.lineplot(data=frame, x='sample_size', y='dose_error', style='index', hue='method')
     plt.show()
@@ -275,7 +291,10 @@ c3t_folder_name = "c3t_more10"
 # tox_eff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 # tox_eff_diff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 
-#sample_size_plot("results/c3t_num_sample2/final dose error.csv", "results/num_samples_exp2/final_dose_error.csv")
+sample_size_plot("results/three_baseline_samples/final_ose_error.csv",
+                 "results/c3t_num_sample3/final dose error.csv",
+                 "results/gp_sample_size/final_dose_error.csv")
+
 #sample_size_plot("results/c3t_num_sample2/utility.csv", "results/num_samples_exp2/utility.csv")
 
 

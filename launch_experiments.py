@@ -35,6 +35,14 @@ def get_command(exp_num, scenario_num, num_samples, sampling_timesteps):
 
     return command
 
+def get_crm_command(exp_num, scenario_num, num_samples, sampling_timesteps):
+    command = f"python new_experiments.py --filepath results/{exp_num} \
+               --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
+               --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
+               --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
+               --set_lmc --use_thall --use_lcb_init" 
+
+    return command
 
 
 servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','172.174.234.5',
@@ -56,11 +64,11 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 
 # test_sample_nums = np.arange(51, 223, 9)
 
-test_sample_nums = np.arange(204, 376, 9)
+test_sample_nums = np.arange(375, 546, 9)
 scenario_idx = 9 # scenario 9
 for idx, num_samples in enumerate(test_sample_nums):
     server = servers[idx]
     #sampling_timesteps = 18 + (idx * 3)
     sampling_timesteps = int((18/51) * num_samples)
     print(num_samples, sampling_timesteps)
-    launch_experiment(server, 'exp_sample_size3', scenario_idx, num_samples, sampling_timesteps)
+    launch_experiment(server, 'exp_sample_size4', scenario_idx, num_samples, sampling_timesteps)

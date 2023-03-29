@@ -217,6 +217,7 @@ class ExperimentRunner:
 
         p_rec = np.zeros((self.num_subgroups, self.num_patients, self.reps))
         metrics_objects = []
+        final_selected_doses = np.empty((self.reps, self.num_subgroups))
 
         for i in range(self.reps):
             print(f"Trial: {i}")
@@ -234,10 +235,17 @@ class ExperimentRunner:
         
             run_metrics = model.run_model(self.dose_scenario, dose_labels)
             metrics_objects.append(run_metrics)
+            final_selected_doses[i, :] = run_metrics.selected_doses
         
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
         self.print_results(exp_metrics, filepath)
+
+        for idx in range(final_selected_doses.shape[1]):
+            unique, counts = np.unique(final_selected_doses[:, idx], return_counts=True)
+            print(f"Subgroup: {idx}")
+            print(np.asarray((unique, counts)).T)
+
 
         def _plot_subgroup_trials(ax, rep_means, test_x, true_x, true_y):
             sns.set()
@@ -373,16 +381,19 @@ if __name__ == "__main__":
     #         os.makedirs(filepath)
     #     main2(scenario, filepath)
 
-    # scenario = DoseFindingScenarios.paper_example_9()
-    # filepath = "results/116_example"
-    # main2(scenario, 51, filepath)
-    num_trials = 100
-    test_sample_nums = np.arange(51, 1000, 9)
-    scenario_idx = 9 # scenario 9
-    scenario = scenarios[scenario_idx]
-    for num_samples in test_sample_nums:
-        filepath = f"results/{folder_name}/num_samples{num_samples}"
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        print(f"Num samples: {num_samples}")
-        main2(scenario, num_samples, num_trials, filepath)
+    scenario = DoseFindingScenarios.paper_example_9()
+    filepath = "results/218_example"
+    if not os.path.exists(filepath):
+        os.makedirs(filepath)
+    main2(scenario, 1200, 100, filepath)
+
+    # num_trials = 100
+    # test_sample_nums = np.arange(51, 1000, 9)
+    # scenario_idx = 9 # scenario 9
+    # scenario = scenarios[scenario_idx]
+    # for num_samples in test_sample_nums:
+    #     filepath = f"results/{folder_name}/num_samples{num_samples}"
+    #     if not os.path.exists(filepath):
+    #         os.makedirs(filepath)
+    #     print(f"Num samples: {num_samples}")
+    #     main2(scenario, num_samples, num_trials, filepath)

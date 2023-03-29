@@ -104,6 +104,7 @@ class TrialMetrics:
         self.cum_tox_by_person = np.zeros(S)
         self.eff_regret_by_person = np.zeros(S)
         self.regret_by_person = np.zeros(S)
+        self.selected_doses = np.zeros(S)
     
     def update_initial_metrics(self, num_subgroups, curr_s, regret, curr_eff, curr_tox, curr_eff_regret, curr_tox_regret):
         self.total_cum_eff[0] = curr_eff

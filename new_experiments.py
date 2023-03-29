@@ -73,6 +73,7 @@ class DoseExperimentMetrics:
         total_frame = total_frame.rename(index={0: 'overall'})
         grouped_metrics_frame = pd.concat([grouped_metrics_frame, total_frame])
         grouped_metrics_frame['final_dose_error'] = np.concatenate([final_dose_error, [final_dose_error.sum() / self.num_subgroups]])
+        grouped_metrics_frame['final_selected_dose'] = np.concatenate([final_selected_doses, [np.nan]])
         self.grouped_metrics_frame = grouped_metrics_frame
 
         self.final_dose_rec = pd.DataFrame({'final_dose_rec': final_selected_doses})

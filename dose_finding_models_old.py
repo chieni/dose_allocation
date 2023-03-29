@@ -8,14 +8,9 @@ import seaborn as sns
 
 from helpers import alpha_func, get_ucb
 from metrics import TrialMetrics
+from thall import calculate_dose_utility_thall
 
 
-
-def calculate_dose_utility_thall(tox_values, eff_values, tox_thre, eff_thre, p_param):
-    tox_term = (tox_values / tox_thre) ** p_param
-    eff_term = ((1. - eff_values) / (1. - eff_thre)) ** p_param
-    utilities = 1. - ( tox_term + eff_term ) ** (1. / p_param)
-    return utilities
 
 def calculate_utility(tox_means, eff_means, tox_thre, eff_thre, tox_weight, eff_weight):
     tox_term = (tox_means - tox_thre) ** 2
@@ -120,6 +115,7 @@ class DoseFindingModel:
         '''
         Originally finalize_results_with_gradient_shared_param
         '''
+        selected_doses = np.empty(self.num_subgroups)
         # Recommendation and observe results
         for s in range(self.num_subgroups):
             # Dose with max empirical efficacy also below toxicity threshold
@@ -135,7 +131,8 @@ class DoseFindingModel:
             # If recommended dose is not above efficacy threshold, assign no dose to rec
             else:
                 max_dose_idx = self.num_doses
-
+            
+            selected_doses[s] = max_dose_idx
             if max_dose_idx != opt_ind[s]:
                 self.metrics.rec_err[s] = 1
             
@@ -176,6 +173,7 @@ class DoseFindingModel:
         self.metrics.cum_tox_by_person = self.metrics.cum_tox[:, -1] / self.metrics.pats_count
         self.metrics.eff_regret_by_person = self.metrics.eff_regret[:, -1] / self.metrics.pats_count
         self.metrics.regret_by_person = self.metrics.regret[:, -1] / self.metrics.pats_count
+        self.metrics.selected_doses = selected_doses
 
     def update_empirical_efficacy_estimate(self, curr_s, timestep):
         return (self.empirical_efficacy_estimate[curr_s, self.allocated_doses[timestep]] * self.n_choose[curr_s, self.allocated_doses[timestep]] + \

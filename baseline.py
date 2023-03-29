@@ -3,13 +3,7 @@ import numpy as np
 import pandas as pd
 
 from data_generation import DoseFindingScenarios, TrialPopulationScenarios
-
-
-def calculate_utility_thall(tox_probs, eff_probs, tox_thre, eff_thre, p_param):
-    tox_term = (tox_probs / tox_thre) ** p_param
-    eff_term = ((1. - eff_probs) / (1. - eff_thre)) ** p_param
-    utilities = 1. - ( tox_term + eff_term ) ** (1. / p_param)
-    return utilities
+from thall import calculate_dose_utility_thall
  
 
 def three_plus_three(dose_scenario, patients, num_samples, num_subgroups):
@@ -76,8 +70,7 @@ def three_plus_three(dose_scenario, patients, num_samples, num_subgroups):
 
     return np.repeat(recommended_dose, num_subgroups), np.array(selected_doses), tox_outcomes, eff_outcomes
 
-def three_plus_three_trials(num_trials, dose_scenario):
-    num_samples = 51
+def three_plus_three_trials(num_trials, dose_scenario, num_samples):
     patient_scenario = TrialPopulationScenarios.equal_population(2)
     
     num_subgroups = patient_scenario.num_subgroups
@@ -102,7 +95,7 @@ def three_plus_three_trials(num_trials, dose_scenario):
         selected_eff_probs = np.array([dose_scenario.get_efficacy_prob(arm_idx, group_idx) \
                                        for arm_idx, group_idx in zip(selected_doses, patients_seen)])
         safety_violations = np.array(selected_tox_probs > dose_scenario.toxicity_threshold, dtype=np.int32)
-        utilities = calculate_utility_thall(selected_tox_probs, selected_eff_probs,
+        utilities = calculate_dose_utility_thall(selected_tox_probs, selected_eff_probs,
                                             dose_scenario.toxicity_threshold, dose_scenario.efficacy_threshold,
                                             dose_scenario.p_param)
                   
@@ -123,6 +116,7 @@ def three_plus_three_trials(num_trials, dose_scenario):
         total_frame = total_frame.rename(index={0: 'overall'})
         grouped_metrics_frame = pd.concat([grouped_metrics_frame, total_frame])
         grouped_metrics_frame['final_dose_error'] = np.concatenate([final_dose_error, [final_dose_error.sum() / num_subgroups]])
+        grouped_metrics_frame['final_selected_dose'] = np.concatenate([final_selected_doses, [np.nan]])      
         metrics_list.append(grouped_metrics_frame)
         trial += 1
 
@@ -159,11 +153,28 @@ scenarios = {
 dose_error_dict = {}
 safety_dict = {}
 utility_dict = {}
-for scenario_idx, dose_scenario in scenarios.items():
-    mean_frame = three_plus_three_trials(1000, dose_scenario)
-    utility_dict[f"scenario{scenario_idx}"] = mean_frame['utilities'].values.tolist()
-    safety_dict[f"scenario{scenario_idx}"] = mean_frame['safety_violations'].values.tolist()
-    dose_error_dict[f"scenario{scenario_idx}"] = mean_frame['final_dose_error'].values.tolist()
+
+# num_samples = 51
+# for scenario_idx, dose_scenario in scenarios.items():
+#     mean_frame = three_plus_three_trials(1000, dose_scenario)
+#     utility_dict[f"scenario{scenario_idx}"] = mean_frame['utilities'].values.tolist()
+#     safety_dict[f"scenario{scenario_idx}"] = mean_frame['safety_violations'].values.tolist()
+#     dose_error_dict[f"scenario{scenario_idx}"] = mean_frame['final_dose_error'].values.tolist()
+
+
+results_foldername = "results/three_baseline_samples/"
+if not os.path.exists(results_foldername):
+    os.makedirs(results_foldername)
+test_sample_nums = np.arange(51, 546, 9)
+scenario_idx = 9 # scenario 9
+dose_scenario = scenarios[scenario_idx]
+for idx, num_samples in enumerate(test_sample_nums):
+    print(num_samples)
+    mean_frame = three_plus_three_trials(100, dose_scenario, num_samples)
+    utility_dict[num_samples] = mean_frame['utilities'].values.tolist()
+    safety_dict[num_samples] = mean_frame['safety_violations'].values.tolist()
+    dose_error_dict[num_samples] = mean_frame['final_dose_error'].values.tolist()
+
 
 utility_frame = pd.DataFrame(utility_dict)
 utility_frame.index = ['0', '1', 'overall']
@@ -173,6 +184,6 @@ dose_error_frame = pd.DataFrame(dose_error_dict)
 safety_frame.index = ['0', '1', 'overall']
 
 
-utility_frame.to_csv("results/threeplusexp/utility.csv")
-dose_error_frame.to_csv("results/threeplusexp/final_ose_error.csv")
-safety_frame.to_csv("results/threeplusexp/safety.csv")
+utility_frame.to_csv(f"{results_foldername}/utility.csv")
+dose_error_frame.to_csv(f"{results_foldername}/final_ose_error.csv")
+safety_frame.to_csv(f"{results_foldername}/safety.csv")
