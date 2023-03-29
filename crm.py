@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 
+import matplotlib.cm as cm 
 import pymc as pm
 from sklearn.preprocessing import scale
 import seaborn as sns
