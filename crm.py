@@ -1,6 +1,5 @@
 import os
 import argparse
-import matplotlib as mpl
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
@@ -442,7 +441,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    # python crm.py --filepath results/crm_exp6 --scenario 1 --num_samples 51 --num_trials 100
+    # python crm.py --filepath results/crm_exp7 --scenario 1 --num_samples 51 --num_trials 1 --add_jitter
     filepath, scenario, num_samples, num_trials, run_one, add_jitter = parse_args()
 
     if run_one:

@@ -26,8 +26,24 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
 
     ssh.close()
 
-def get_command(exp_num, scenario_num, num_samples, sampling_timesteps):
-    command = f"python new_experiments.py --filepath results/{exp_num} \
+def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, num_trials):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
+    crm_command = get_crm_command(exp_name, scenario_num, num_samples, num_trials)
+    print(crm_command)
+    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {crm_command}' ")
+    count = 0
+    for line in iter(stderr.readline, ""):
+        print(line, end="")
+        count += 1
+        if count > 100:
+            break
+    ssh.close()
+
+
+def get_command(exp_name, scenario_num, num_samples, sampling_timesteps):
+    command = f"python new_experiments.py --filepath results/{exp_name} \
                --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
                --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
                --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
@@ -35,12 +51,9 @@ def get_command(exp_num, scenario_num, num_samples, sampling_timesteps):
 
     return command
 
-def get_crm_command(exp_num, scenario_num, num_samples, sampling_timesteps):
-    command = f"python new_experiments.py --filepath results/{exp_num} \
-               --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
-               --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
-               --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
-               --set_lmc --use_thall --use_lcb_init" 
+def get_crm_command(exp_name, scenario_num, num_samples, num_trials):
+    command = f"python crm.py --filepath results/{exp_name} \
+                --scenario {scenario_num} --num_samples {num_samples} --num_trials {num_trials} --add_jitter" 
 
     return command
 
@@ -64,11 +77,18 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 
 # test_sample_nums = np.arange(51, 223, 9)
 
-test_sample_nums = np.arange(375, 546, 9)
-scenario_idx = 9 # scenario 9
-for idx, num_samples in enumerate(test_sample_nums):
-    server = servers[idx]
-    #sampling_timesteps = 18 + (idx * 3)
-    sampling_timesteps = int((18/51) * num_samples)
-    print(num_samples, sampling_timesteps)
-    launch_experiment(server, 'exp_sample_size4', scenario_idx, num_samples, sampling_timesteps)
+# test_sample_nums = np.arange(375, 546, 9)
+# scenario_idx = 9 # scenario 9
+# for idx, num_samples in enumerate(test_sample_nums):
+#     server = servers[idx]
+#     #sampling_timesteps = 18 + (idx * 3)
+#     sampling_timesteps = int((18/51) * num_samples)
+#     print(num_samples, sampling_timesteps)
+#     launch_experiment(server, 'exp_sample_size4', scenario_idx, num_samples, sampling_timesteps)
+
+# For all scenarios CRM
+num_samples = 51
+num_trials = 100
+for idx, server in enumerate(servers):
+    scenario_idx = idx + 1
+    launch_crm_experiment(server, 'crm_scenarios', scenario_idx, num_samples, num_trials)
