@@ -16,7 +16,6 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
     exp_command = get_command(exp_name, scenario_num, num_samples, sampling_timesteps)
     print(exp_command)
     stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {exp_command} >/dev/null 2>&1' ")
-    # >/dev/null 2>&1
     # count = 0
     # for line in iter(stderr.readline, ""):
     #     print(line, end="")
@@ -32,13 +31,13 @@ def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, num_tri
     ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
     crm_command = get_crm_command(exp_name, scenario_num, num_samples, num_trials)
     print(crm_command)
-    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {crm_command}' ")
-    count = 0
-    for line in iter(stderr.readline, ""):
-        print(line, end="")
-        count += 1
-        if count > 100:
-            break
+    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {crm_command} >/dev/null 2>&1' ")
+    # count = 0
+    # for line in iter(stderr.readline, ""):
+    #     print(line, end="")
+    #     count += 1
+    #     if count > 100:
+    #         break
     ssh.close()
 
 
@@ -91,4 +90,4 @@ num_samples = 51
 num_trials = 100
 for idx, server in enumerate(servers):
     scenario_idx = idx + 1
-    launch_crm_experiment(server, 'crm_scenarios', scenario_idx, num_samples, num_trials)
+    launch_crm_experiment(server, 'crm_scenarios3', scenario_idx, num_samples, num_trials)

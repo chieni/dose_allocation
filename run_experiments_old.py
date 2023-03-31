@@ -210,11 +210,15 @@ class ExperimentRunner:
         
 
         self.make_plots(dose_labels, exp_metrics)
-    
-    def run_one_param(self, model_type, a0, filepath):
-        dose_skeleton = np.mean(self.p_true, axis=0)
-        dose_skeleton_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
 
+    def jitter_dose_skeleton(self, dose_value):
+        new_val = -1
+        while new_val <= 0:
+            new_val = dose_value + np.random.uniform(-0.1, 0.1)
+        return new_val
+
+    def run_one_param(self, model_type, a0, filepath, add_jitter):
+        dose_skeleton = np.mean(self.p_true, axis=0)
         p_rec = np.zeros((self.num_subgroups, self.num_patients, self.reps))
         metrics_objects = []
         final_selected_doses = np.empty((self.reps, self.num_subgroups))
@@ -226,13 +230,18 @@ class ExperimentRunner:
 
             for tau in range(self.num_patients):
                 p_rec[pats[tau], tau:, i] += 1
+
             dose_labels = np.zeros((self.num_subgroups, self.num_doses))
-                
-            model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
+            print(add_jitter)
+            if add_jitter:
+                for dose_idx in range(dose_skeleton.shape[0]):
+                    dose_skeleton[dose_idx] = self.jitter_dose_skeleton(dose_skeleton[dose_idx])
+                print(dose_skeleton)
+
             for s in range(self.num_subgroups):
-                #dose_labels[s, :] = TwoParamSharedModel.initialize_dose_label(p_true[s, :], a0, b0)
                 dose_labels[s, :] = TanhModel.initialize_dose_label(dose_skeleton, a0)
-        
+
+            model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
             run_metrics = model.run_model(self.dose_scenario, dose_labels)
             metrics_objects.append(run_metrics)
             final_selected_doses[i, :] = run_metrics.selected_doses
@@ -333,26 +342,18 @@ def main():
     #runner.run_one_param(TanhModel, a0)
     runner.run_one_param(OGTanhModel, a0)
 
-def main2(scenario, num_patients, reps, filepath):
+def main2(scenario, num_patients, reps, filepath, add_jitter):
     learning_rate = 0.01
-
     num_subgroups = scenario.num_subgroups
-
     patient_scenario = TrialPopulationScenarios.equal_population(num_subgroups)
     arr_rate = patient_scenario.arrival_rate
 
     runner = ExperimentRunner(reps, scenario, num_patients, arr_rate, learning_rate)
-
-    # a0 = 0.1
-    # b0 = 0.1
-    # runner.run_two_param(TwoParamAllSharedModel, a0, b0)
-
     a0 = 1 / np.e
-    #runner.run_one_param(TanhModel, a0)
-    runner.run_one_param(OGTanhModel, a0, filepath)
+    runner.run_one_param(OGTanhModel, a0, filepath, add_jitter)
 
 if __name__ == "__main__":
-    folder_name = "c3t_num_sample3"
+    folder_name = "c3t_scenarios_jitter2"
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),
@@ -375,17 +376,17 @@ if __name__ == "__main__":
         19: DoseFindingScenarios.paper_example_19()
     }
 
-    # for idx, scenario in scenarios.items():
-    #     filepath = f"results/{folder_name}/scenario{idx}"
-    #     if not os.path.exists(filepath):
-    #         os.makedirs(filepath)
-    #     main2(scenario, filepath)
+    for idx, scenario in scenarios.items():
+        filepath = f"results/{folder_name}/scenario{idx}"
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        main2(scenario, 51, 1000, filepath, True)
 
-    scenario = DoseFindingScenarios.paper_example_9()
-    filepath = "results/218_example"
-    if not os.path.exists(filepath):
-        os.makedirs(filepath)
-    main2(scenario, 1200, 100, filepath)
+    # scenario = DoseFindingScenarios.paper_example_9()
+    # filepath = "results/218_example"
+    # if not os.path.exists(filepath):
+    #     os.makedirs(filepath)
+    # main2(scenario, 1200, 100, filepath)
 
     # num_trials = 100
     # test_sample_nums = np.arange(51, 1000, 9)

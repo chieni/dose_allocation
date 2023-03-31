@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 
 
-def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
+def copy_files(folder_name, num_trials, num_subgroups):
     servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','172.174.234.5',
             '172.174.234.65','172.174.234.185', '172.174.234.240', '172.174.233.180','172.174.235.241',
             '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
@@ -30,7 +30,7 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            path = f"results/{out_folder_name}/scenario{idx+1}"
+            path = f"results/{folder_name}/scenario{idx+1}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
@@ -38,7 +38,7 @@ def copy_files(out_folder_name, folder_name, num_trials, num_subgroups):
         
         # Download trial files
         # for trial in range(num_trials):
-        #     local_path = f"results/{out_folder_name}/scenario{idx+1}/trial{trial}"
+        #     local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
         #     if not os.path.exists(local_path):
         #         os.makedirs(local_path)
         #     remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
@@ -81,6 +81,6 @@ def combine_files_sample_sizes(filepath):
             metric_frame[num_samples] = frames[idx][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-# copy_files('exp_sample_size4', 'exp_sample_size4', 100, 2)
+copy_files('crm_scenarios2', 100, 2)
 # combine_files('exp_sample_size4')
-combine_files_sample_sizes('gp_sample_size')
+#combine_files_sample_sizes('gp_sample_size')

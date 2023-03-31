@@ -6,9 +6,9 @@ import numpy as np
 
 
 def dose_error_plot(three_filename, c3t_filename, gp_filename, out_filename):
-    three_frame = pd.read_csv(three_filename, index_col=0)
-    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
-    three_melt['method'] = '3+3'
+    # three_frame = pd.read_csv(three_filename, index_col=0)
+    # three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
+    # three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
@@ -18,7 +18,8 @@ def dose_error_plot(three_filename, c3t_filename, gp_filename, out_filename):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    # frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -56,7 +57,8 @@ def safety_plot(three_filename, c3t_filename, gp_filename, out_filename):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    # frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -138,7 +140,8 @@ def utility_plot(three_filename, c3t_filename, gp_filename, out_filename):
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    # frame = pd.concat([c3t_melt, gp_melt, three_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     sns.set_style("whitegrid")
@@ -147,7 +150,7 @@ def utility_plot(three_filename, c3t_filename, gp_filename, out_filename):
     # fig = sns.pointplot(data=frame, x='scenario', y='utility', hue='method', join=False)
     # fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 17.5), ylim=(-0.1, 1.0))
     fig = sns.pointplot(data=frame, x='utility', y='scenario', hue='method', capsize=0.4, errwidth=2.0, scale=0.9, join=False)
-    fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 0.5), ylim=(-0.5, 17.5))
+    fig.set(xlabel=None, ylabel=None, xlim=(-1, 1), ylim=(-0.5, 17.5))
 
     plt.legend([],[], frameon=False)
     plt.tick_params(
@@ -240,14 +243,16 @@ def sample_size_plot(three_filename, c3t_filename, gp_filename):
     test_sample_nums = np.arange(51, 538, 9).astype(int)
 
     sns.set()
-    three_frame = pd.read_csv(three_filename, index_col=0)
-    three_frame.columns = three_frame.columns.astype(int)
-    three_frame = three_frame[test_sample_nums]
-    three_frame.columns = test_sample_nums
 
-    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
-    three_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
-    three_melt['method'] = '3+3'
+    if three_filename is not None:
+        three_frame = pd.read_csv(three_filename, index_col=0)
+        three_frame.columns = three_frame.columns.astype(int)
+        three_frame = three_frame[test_sample_nums]
+        three_frame.columns = test_sample_nums
+
+        three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+        three_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
+        three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_frame.columns = c3t_frame.columns.astype(int)
@@ -266,7 +271,9 @@ def sample_size_plot(three_filename, c3t_filename, gp_filename):
     gp_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([three_melt, c3t_melt, gp_melt])
+    if three_filename is not None:
+        frame = pd.concat([three_melt, c3t_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
     sns.lineplot(data=frame, x='sample_size', y='dose_error', style='index', hue='method')
     plt.show()
@@ -281,7 +288,7 @@ tox_filename = f"results/{folder_name}/tox_outcome.csv"
 eff_filename = f"results/{folder_name}/eff_outcome.csv"
 utility_filename = f"results/{folder_name}/thall_utilities.csv"
 
-c3t_folder_name = "c3t_more10"
+c3t_folder_name = "c3t_scenarios_jitter2"
 
 # safety_plot(f"results/{c3t_folder_name}/safety violations.csv", safety_filename, f"results/{folder_name}")
 # dose_error_plot(f"results/{c3t_folder_name}/final dose error.csv", dose_filename, f"results/{folder_name}")
@@ -291,16 +298,17 @@ c3t_folder_name = "c3t_more10"
 # tox_eff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 # tox_eff_diff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 
-sample_size_plot("results/three_baseline_samples/final_ose_error.csv",
-                 "results/c3t_num_sample3/final dose error.csv",
-                 "results/gp_sample_size/final_dose_error.csv")
+# sample_size_plot("results/three_baseline_samples/final_ose_error.csv",
+#                  "results/c3t_num_sample3/final dose error.csv",
+#                  "results/gp_sample_size/final_dose_error.csv")
+
 
 #sample_size_plot("results/c3t_num_sample2/utility.csv", "results/num_samples_exp2/utility.csv")
 
 
 # dose_error_plot(f"results/threeplusexp/final_ose_error.csv", f"results/{c3t_folder_name}/final dose error.csv",
-#                 dose_filename, f"results/{folder_name}/all_dose_error_comparison_plot.png")
+#                 dose_filename, f"results/{folder_name}/all_dose_error_comparison_plot_jitter2.png")
 # safety_plot(f"results/threeplusexp/safety.csv", f"results/{c3t_folder_name}/safety violations.csv",
-#             safety_filename, f"results/{folder_name}/all_safety_comparison_plot.png")
-# utility_plot(f"results/threeplusexp/utility.csv", f"results/{c3t_folder_name}/thall_utility.csv",
-#              utility_filename, f"results/{folder_name}/all_utility_comparison_plot.png")
+#             safety_filename, f"results/{folder_name}/safety_comparison_plot.png")
+utility_plot(f"results/threeplusexp/utility.csv", f"results/{c3t_folder_name}/thall_utility.csv",
+             utility_filename, f"results/{folder_name}/all_utility_comparison_plot_jitter2.png")

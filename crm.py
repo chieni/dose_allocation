@@ -62,7 +62,7 @@ class CRM:
     def jitter_dose_skeleton(self, dose_value):
         new_val = -1
         while new_val <= 0:
-            new_val = dose_value + np.random.uniform(-0.15, 0.15)
+            new_val = dose_value + np.random.uniform(-0.1, 0.1)
         return new_val
 
     def run_trial(self, dose_scenario, patients, num_subgroups, out_foldername, add_jitter):
@@ -224,7 +224,6 @@ class CRM:
         a0 = 1 / np.e
         dose_skeleton = np.mean(dose_scenario.toxicity_probs, axis=0)
         dose_labels = CRM.init_tangent_labels(dose_skeleton, a0)
-        import pdb; pdb.set_trace()
         patients = patients.astype(int)
 
         # Assign first patient to lowest dose level
