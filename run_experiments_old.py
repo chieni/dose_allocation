@@ -12,13 +12,12 @@ from data_generation import DoseFindingScenarios, TrialPopulationScenarios
 
 np.random.seed(0)
 class ExperimentRunner:
-    def __init__(self, reps, scenario, num_patients, arr_rate, learning_rate):
+    def __init__(self, reps, scenario, num_patients, learning_rate):
         self.reps = reps
         self.dose_scenario = scenario
         self.num_doses = scenario.num_doses
         self.num_patients = num_patients
         self.num_subgroups = scenario.num_subgroups
-        self.arr_rate = arr_rate
         self.tox_thre = scenario.toxicity_threshold
         self.eff_thre = scenario.efficacy_threshold
         self.p_true = scenario.toxicity_probs # tox
@@ -26,23 +25,23 @@ class ExperimentRunner:
         self.opt = scenario.optimal_doses
         self.learning_rate = learning_rate
 
-    def gen_patients(self):
-        '''
-        Generates all patients for an experiment of length T
-        '''
-        # Arrival proportion of each subgroup. If arrive_rate = [5, 4, 3],
-        # arrive_dist = [5/12, 4/12, 3/12]
-        arrive_sum = sum(self.arr_rate)
-        arrive_dist = [rate/arrive_sum for rate in self.arr_rate]
-        arrive_dist.insert(0, 0)
+    # def gen_patients(self):
+    #     '''
+    #     Generates all patients for an experiment of length T
+    #     '''
+    #     # Arrival proportion of each subgroup. If arrive_rate = [5, 4, 3],
+    #     # arrive_dist = [5/12, 4/12, 3/12]
+    #     arrive_sum = sum(self.arr_rate)
+    #     arrive_dist = [rate/arrive_sum for rate in self.arr_rate]
+    #     arrive_dist.insert(0, 0)
 
-        # [0, 5/12, 9/12, 12/12]
-        arrive_dist_bins = np.cumsum(arrive_dist)
+    #     # [0, 5/12, 9/12, 12/12]
+    #     arrive_dist_bins = np.cumsum(arrive_dist)
 
-        # Random numbers between 0 and 1 in an array of shape (1, T)
-        patients_gen = np.random.rand(self.num_patients)
-        patients = np.digitize(patients_gen, arrive_dist_bins) - 1
-        return patients
+    #     # Random numbers between 0 and 1 in an array of shape (1, T)
+    #     patients_gen = np.random.rand(self.num_patients)
+    #     patients = np.digitize(patients_gen, arrive_dist_bins) - 1
+    #     return patients
 
 
     def print_results(self, out_metrics, filepath):
@@ -214,33 +213,36 @@ class ExperimentRunner:
     def jitter_dose_skeleton(self, dose_value):
         new_val = -1
         while new_val <= 0:
-            new_val = dose_value + np.random.uniform(-0.1, 0.1)
+            new_val = dose_value + np.random.uniform(-0.15, 0.15)
         return new_val
 
-    def run_one_param(self, model_type, a0, filepath, add_jitter):
-        dose_skeleton = np.mean(self.p_true, axis=0)
-        p_rec = np.zeros((self.num_subgroups, self.num_patients, self.reps))
+    def run_one_param(self, model_type, a0, filepath, patient_scenario, add_jitter):
         metrics_objects = []
         final_selected_doses = np.empty((self.reps, self.num_subgroups))
 
         for i in range(self.reps):
             print(f"Trial: {i}")
-            # patients arrival generation
-            pats = self.gen_patients()
 
-            for tau in range(self.num_patients):
-                p_rec[pats[tau], tau:, i] += 1
-
-            dose_labels = np.zeros((self.num_subgroups, self.num_doses))
-            print(add_jitter)
+            pats = patient_scenario.generate_samples(self.num_patients)
+            print(self.p_true)
+            dose_skeleton = np.empty((self.num_subgroups, self.num_doses))
             if add_jitter:
-                for dose_idx in range(dose_skeleton.shape[0]):
-                    dose_skeleton[dose_idx] = self.jitter_dose_skeleton(dose_skeleton[dose_idx])
-                print(dose_skeleton)
+                for subgroup_idx in range(self.num_subgroups):
+                    for dose_idx in range(self.num_doses):
+                        dose_skeleton[subgroup_idx, dose_idx] = self.jitter_dose_skeleton(self.p_true[subgroup_idx, dose_idx])
 
-            for s in range(self.num_subgroups):
-                dose_labels[s, :] = TanhModel.initialize_dose_label(dose_skeleton, a0)
+                # dose_skeleton_temp = np.mean(self.p_true, axis=0)
+                # for dose_idx in range(self.num_doses):
+                #     dose_skeleton_temp[dose_idx] = self.jitter_dose_skeleton(dose_skeleton_temp[dose_idx])
+                # for subgroup_idx in range(self.num_subgroups):
+                #     dose_skeleton[subgroup_idx, :] = dose_skeleton_temp
 
+            else:
+                for subgroup_idx in range(self.num_subgroups):
+                    dose_skeleton[subgroup_idx, :] = np.mean(self.p_true, axis=0)
+
+            print(dose_skeleton)
+            dose_labels = TanhModel.initialize_dose_label(dose_skeleton, a0)
             model = model_type(self.num_patients, self.num_subgroups, self.num_doses, pats, self.learning_rate, a0)
             run_metrics = model.run_model(self.dose_scenario, dose_labels)
             metrics_objects.append(run_metrics)
@@ -342,18 +344,14 @@ def main():
     #runner.run_one_param(TanhModel, a0)
     runner.run_one_param(OGTanhModel, a0)
 
-def main2(scenario, num_patients, reps, filepath, add_jitter):
+def main2(scenario, num_patients, reps, filepath, patient_scenario, add_jitter):
     learning_rate = 0.01
-    num_subgroups = scenario.num_subgroups
-    patient_scenario = TrialPopulationScenarios.equal_population(num_subgroups)
-    arr_rate = patient_scenario.arrival_rate
-
-    runner = ExperimentRunner(reps, scenario, num_patients, arr_rate, learning_rate)
+    runner = ExperimentRunner(reps, scenario, num_patients, learning_rate)
     a0 = 1 / np.e
-    runner.run_one_param(OGTanhModel, a0, filepath, add_jitter)
+    runner.run_one_param(OGTanhModel, a0, filepath, patient_scenario, add_jitter)
 
 if __name__ == "__main__":
-    folder_name = "c3t_scenarios_jitter2"
+    
     scenarios = {
         9: DoseFindingScenarios.paper_example_9(),
         1: DoseFindingScenarios.paper_example_1(),
@@ -375,12 +373,13 @@ if __name__ == "__main__":
         18: DoseFindingScenarios.paper_example_18(),
         19: DoseFindingScenarios.paper_example_19()
     }
-
-    for idx, scenario in scenarios.items():
-        filepath = f"results/{folder_name}/scenario{idx}"
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
-        main2(scenario, 51, 1000, filepath, True)
+    # folder_name = "c3t_scenarios_jitter9"
+    # patient_scenario = TrialPopulationScenarios.equal_population(2)
+    # for idx, scenario in scenarios.items():
+    #     filepath = f"results/{folder_name}/scenario{idx}"
+    #     if not os.path.exists(filepath):
+    #         os.makedirs(filepath)
+    #     main2(scenario, 51, 1000, filepath, patient_scenario, True)
 
     # scenario = DoseFindingScenarios.paper_example_9()
     # filepath = "results/218_example"
@@ -388,13 +387,32 @@ if __name__ == "__main__":
     #     os.makedirs(filepath)
     # main2(scenario, 1200, 100, filepath)
 
-    # num_trials = 100
+    # folder_name = "c3t_num_samples_jitter2"
+    # num_trials = 1000
     # test_sample_nums = np.arange(51, 1000, 9)
     # scenario_idx = 9 # scenario 9
     # scenario = scenarios[scenario_idx]
+    # patient_scenario = TrialPopulationScenarios.equal_population(2)
     # for num_samples in test_sample_nums:
     #     filepath = f"results/{folder_name}/num_samples{num_samples}"
     #     if not os.path.exists(filepath):
     #         os.makedirs(filepath)
     #     print(f"Num samples: {num_samples}")
-    #     main2(scenario, num_samples, num_trials, filepath)
+    #     main2(scenario, num_samples, num_trials, filepath, patient_scenario, True)
+
+    folder_name = "c3t_ratios1000_2"
+    num_trials = 1000
+    num_samples = 201
+    scenario = DoseFindingScenarios.paper_example_11()
+    if not os.path.exists(f"results/{folder_name}"):
+        os.makedirs(f"results/{folder_name}")
+    patient_ratios = np.arange(0.1, 1.0, 0.05)
+    for patient_ratio in patient_ratios:
+        filepath = f"results/{folder_name}/ratio{patient_ratio}"
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        print(f"Ratio: {patient_ratio}")
+        patient_scenario = TrialPopulationScenarios.skewed_dual_population(patient_ratio)
+        print(patient_scenario.arrival_rate)
+        main2(scenario, num_samples, num_trials, filepath, patient_scenario, True)
+

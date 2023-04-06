@@ -44,6 +44,7 @@ def dose_error_plot(three_filename, c3t_filename, gp_filename, out_filename):
     )
     plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=500)
 
+
 def safety_plot(three_filename, c3t_filename, gp_filename, out_filename):
     three_frame = pd.read_csv(three_filename, index_col=0)
     three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
@@ -85,6 +86,7 @@ def safety_plot(three_filename, c3t_filename, gp_filename, out_filename):
         labelleft=False
     )
     plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
+
 
 def tox_plot(c3t_folder_name, gp_filename, folder_name):
     c3t_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
@@ -164,6 +166,7 @@ def utility_plot(three_filename, c3t_filename, gp_filename, out_filename):
     )
     plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
 
+
 def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename, folder_name):
     c3t_tox_filename = f"results/{c3t_folder_name}/toxicity by person.csv"
     c3t_eff_filename = f"results/{c3t_folder_name}/efficacy by person.csv"
@@ -239,27 +242,26 @@ def util_with_thall(c3t_folder_name, gp_filename, folder_name):
 
 
 
-def sample_size_plot(three_filename, c3t_filename, gp_filename):
+def sample_size_plot(three_filename, c3t_filename, gp_filename, value_name):
     test_sample_nums = np.arange(51, 538, 9).astype(int)
 
     sns.set()
 
-    if three_filename is not None:
-        three_frame = pd.read_csv(three_filename, index_col=0)
-        three_frame.columns = three_frame.columns.astype(int)
-        three_frame = three_frame[test_sample_nums]
-        three_frame.columns = test_sample_nums
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_frame.columns = three_frame.columns.astype(int)
+    three_frame = three_frame[test_sample_nums]
+    three_frame.columns = test_sample_nums
 
-        three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
-        three_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
-        three_melt['method'] = '3+3'
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='sample_size', value_name=value_name)
+    three_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
+    three_melt['method'] = '3+3'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_frame.columns = c3t_frame.columns.astype(int)
     c3t_frame = c3t_frame[test_sample_nums]
     c3t_frame.columns = test_sample_nums
     
-    c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+    c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='sample_size', value_name=value_name)
     c3t_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
     c3t_melt['method'] = 'c3t'
 
@@ -267,15 +269,41 @@ def sample_size_plot(three_filename, c3t_filename, gp_filename):
     gp_frame.columns = gp_frame.columns.astype(int)
     gp_frame = gp_frame[test_sample_nums]
     gp_frame.columns = test_sample_nums
-    gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='sample_size', value_name='dose_error')
+    gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='sample_size', value_name=value_name)
     gp_melt.rename({'index': 'subgroup', 'scenario': 'sample_size'})
     gp_melt['method'] = 'gp'
 
-    if three_filename is not None:
-        frame = pd.concat([three_melt, c3t_melt, gp_melt])
-    frame = pd.concat([c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, c3t_melt, gp_melt])
     frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
-    sns.lineplot(data=frame, x='sample_size', y='dose_error', style='index', hue='method')
+    sns.lineplot(data=frame, x='sample_size', y=value_name, style='index', hue='method')
+    plt.show()
+
+def ratios_plot(three_filename, c3t_filename):
+    test_ratios = np.arange(0.1, 1.0, 0.05).astype(str)
+
+    sns.set()
+
+    three_frame = pd.read_csv(three_filename, index_col=0)
+    three_frame.columns = three_frame.columns.astype(str)
+    three_frame = three_frame[test_ratios]
+    three_frame.columns = test_ratios
+
+    three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name='dose_error')
+    three_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    three_melt['method'] = '3+3'
+
+    c3t_frame = pd.read_csv(c3t_filename, index_col=0)
+    c3t_frame.columns = c3t_frame.columns.astype(str)
+    c3t_frame = c3t_frame[test_ratios]
+    c3t_frame.columns = test_ratios
+    
+    c3t_melt = pd.melt(c3t_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name='dose_error')
+    c3t_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    c3t_melt['method'] = 'c3t'
+
+    frame = pd.concat([three_melt, c3t_melt])
+    frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
+    sns.lineplot(data=frame, x='subgroup_ratio', y='dose_error', style='index', hue='method')
     plt.show()
 
 
@@ -288,7 +316,7 @@ tox_filename = f"results/{folder_name}/tox_outcome.csv"
 eff_filename = f"results/{folder_name}/eff_outcome.csv"
 utility_filename = f"results/{folder_name}/thall_utilities.csv"
 
-c3t_folder_name = "c3t_scenarios_jitter2"
+c3t_folder_name = "c3t_scenarios_jitter9"
 
 # safety_plot(f"results/{c3t_folder_name}/safety violations.csv", safety_filename, f"results/{folder_name}")
 # dose_error_plot(f"results/{c3t_folder_name}/final dose error.csv", dose_filename, f"results/{folder_name}")
@@ -298,17 +326,23 @@ c3t_folder_name = "c3t_scenarios_jitter2"
 # tox_eff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 # tox_eff_diff_plot(c3t_folder_name, tox_filename, eff_filename, f"results/{folder_name}")
 
+
+
 # sample_size_plot("results/three_baseline_samples/final_ose_error.csv",
-#                  "results/c3t_num_sample3/final dose error.csv",
-#                  "results/gp_sample_size/final_dose_error.csv")
+#                  "results/c3t_num_samples_jitter2/final dose error.csv",
+#                  "results/gp_sample_size/final_dose_error.csv", 'dose_error')
 
+# sample_size_plot("results/three_baseline_samples/utility.csv", "results/c3t_num_samples_jitter/utility.csv",
+#                  "results/gp_sample_size/utility.csv", 'utility')
 
-#sample_size_plot("results/c3t_num_sample2/utility.csv", "results/num_samples_exp2/utility.csv")
-
+# sample_size_plot("results/three_baseline_samples/safety.csv", "results/c3t_num_samples_jitter/safety violations.csv",
+#                  "results/gp_sample_size/safety_violations.csv", 'safety violatations')
 
 # dose_error_plot(f"results/threeplusexp/final_ose_error.csv", f"results/{c3t_folder_name}/final dose error.csv",
-#                 dose_filename, f"results/{folder_name}/all_dose_error_comparison_plot_jitter2.png")
+#                 dose_filename, f"results/{folder_name}/dose_comparison_9.png")
 # safety_plot(f"results/threeplusexp/safety.csv", f"results/{c3t_folder_name}/safety violations.csv",
-#             safety_filename, f"results/{folder_name}/safety_comparison_plot.png")
-utility_plot(f"results/threeplusexp/utility.csv", f"results/{c3t_folder_name}/thall_utility.csv",
-             utility_filename, f"results/{folder_name}/all_utility_comparison_plot_jitter2.png")
+#             safety_filename, f"results/{folder_name}/safety_comparison_9.png")
+# utility_plot(f"results/threeplusexp/utility.csv", f"results/{c3t_folder_name}/thall_utility.csv",
+#              utility_filename, f"results/{folder_name}/utility_comparison_9.png")
+
+ratios_plot("results/three_baseline_ratios/final_ose_error.csv", "results/c3t_ratios1000_2/final dose error.csv")

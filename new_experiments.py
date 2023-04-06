@@ -943,6 +943,7 @@ def parse_args():
     parser.add_argument("--set_lmc", action="store_true", help="Fix LMC coeffs for final model if true.")
     parser.add_argument("--use_thall", action="store_true", help="Use Thall utility.")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
+    parser.add_argument("--group_ratio", type=float, help="Subgroup skew.")
     args = parser.parse_args()
 
     scenarios = {
@@ -983,13 +984,14 @@ def parse_args():
     set_lmc = args.set_lmc
     use_thall = args.use_thall
     run_one = args.run_one
+    group_ratio = args.group_ratio
     return filepath, scenarios[scenario], beta_param, num_samples, sampling_timesteps,\
-           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one
+           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio
 
 
 if __name__ == "__main__":
     filepath, dose_scenario, beta_param, num_samples, sampling_timesteps, tox_lengthscale_init, \
-        eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one = parse_args()
+        eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio = parse_args()
 
     increase_beta_param = False
     use_utility = False
@@ -998,7 +1000,9 @@ if __name__ == "__main__":
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
-    patient_scenario = TrialPopulationScenarios.equal_population(2)
+    # patient_scenario = TrialPopulationScenarios.equal_population(2)
+    patient_scenario = TrialPopulationScenarios.skewed_dual_population(group_ratio)
+    
 
     # Calculate tox_mean_init and eff_mean_init based on thresholds
     # tox_mean_init = NormalDist().inv_cdf(dose_scenario.toxicity_threshold)

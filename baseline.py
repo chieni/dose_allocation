@@ -70,9 +70,7 @@ def three_plus_three(dose_scenario, patients, num_samples, num_subgroups):
 
     return np.repeat(recommended_dose, num_subgroups), np.array(selected_doses), tox_outcomes, eff_outcomes
 
-def three_plus_three_trials(num_trials, dose_scenario, num_samples):
-    patient_scenario = TrialPopulationScenarios.equal_population(2)
-    
+def three_plus_three_trials(num_trials, dose_scenario, num_samples, patient_scenario):
     num_subgroups = patient_scenario.num_subgroups
     optimal_doses = dose_scenario.optimal_doses
     metrics_list = []
@@ -153,6 +151,10 @@ scenarios = {
 dose_error_dict = {}
 safety_dict = {}
 utility_dict = {}
+results_foldername = "results/three_baseline_ratios/"
+if not os.path.exists(results_foldername):
+    os.makedirs(results_foldername)
+
 
 # num_samples = 51
 # for scenario_idx, dose_scenario in scenarios.items():
@@ -162,18 +164,31 @@ utility_dict = {}
 #     dose_error_dict[f"scenario{scenario_idx}"] = mean_frame['final_dose_error'].values.tolist()
 
 
-results_foldername = "results/three_baseline_samples/"
-if not os.path.exists(results_foldername):
-    os.makedirs(results_foldername)
-test_sample_nums = np.arange(51, 546, 9)
-scenario_idx = 9 # scenario 9
+# patient_scenario = TrialPopulationScenarios.equal_population(2)
+# test_sample_nums = np.arange(51, 546, 9)
+# scenario_idx = 9 # scenario 9
+# dose_scenario = scenarios[scenario_idx]
+# for idx, num_samples in enumerate(test_sample_nums):
+#     print(num_samples)
+#     mean_frame = three_plus_three_trials(100, dose_scenario, num_samples, patient_scenario)
+#     utility_dict[num_samples] = mean_frame['utilities'].values.tolist()
+#     safety_dict[num_samples] = mean_frame['safety_violations'].values.tolist()
+#     dose_error_dict[num_samples] = mean_frame['final_dose_error'].values.tolist()
+
+
+patient_ratios = np.arange(0.1, 1.0, 0.05)
+scenario_idx = 11
 dose_scenario = scenarios[scenario_idx]
-for idx, num_samples in enumerate(test_sample_nums):
-    print(num_samples)
-    mean_frame = three_plus_three_trials(100, dose_scenario, num_samples)
-    utility_dict[num_samples] = mean_frame['utilities'].values.tolist()
-    safety_dict[num_samples] = mean_frame['safety_violations'].values.tolist()
-    dose_error_dict[num_samples] = mean_frame['final_dose_error'].values.tolist()
+num_samples = 201
+num_trials = 100
+for patient_ratio in patient_ratios:
+    print(patient_ratio)
+    patient_scenario = TrialPopulationScenarios.skewed_dual_population(patient_ratio)
+    print(patient_scenario.arrival_rate)
+    mean_frame = three_plus_three_trials(num_trials, dose_scenario, num_samples, patient_scenario)
+    utility_dict[patient_ratio] = mean_frame['utilities'].values.tolist()
+    safety_dict[patient_ratio] = mean_frame['safety_violations'].values.tolist()
+    dose_error_dict[patient_ratio] = mean_frame['final_dose_error'].values.tolist()
 
 
 utility_frame = pd.DataFrame(utility_dict)

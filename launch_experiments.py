@@ -36,17 +36,17 @@ def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, num_tri
     # for line in iter(stderr.readline, ""):
     #     print(line, end="")
     #     count += 1
-    #     if count > 100:
+    #     if count > 20:
     #         break
     ssh.close()
 
 
-def get_command(exp_name, scenario_num, num_samples, sampling_timesteps):
+def get_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio):
     command = f"python new_experiments.py --filepath results/{exp_name} \
                --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
                --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
                --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
-               --set_lmc --use_thall --use_lcb_init" 
+               --set_lmc --use_thall --use_lcb_init --group_ratio {group_ratio}" 
 
     return command
 
@@ -86,8 +86,26 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 #     launch_experiment(server, 'exp_sample_size4', scenario_idx, num_samples, sampling_timesteps)
 
 # For all scenarios CRM
-num_samples = 51
+# num_samples = 51
+# num_trials = 100
+# for idx, server in enumerate(servers):
+#     scenario_idx = idx + 1
+#     launch_crm_experiment(server, 'crm_scenarios3', scenario_idx, num_samples, num_trials)
+
+# 5, 6, 9, 13, 15, 18, 19
+# python crm.py --filepath results/crm_scenarios4 --scenario 14 --num_samples 51 --num_trials 100 --add_jitter
+# scenarios_to_try = [6, 19]
+# num_samples = 51
+# num_trials = 100
+# for idx, server in enumerate(servers):
+#     scenario_idx = scenarios_to_try[idx % len(scenarios_to_try)]
+#     launch_crm_experiment(server, 'crm_scenarios5', scenario_idx, num_samples, num_trials)
+
+patient_ratios = np.arange(0.1, 1.0, 0.05)
+scenario_idx = 11
+num_samples = 201
 num_trials = 100
-for idx, server in enumerate(servers):
-    scenario_idx = idx + 1
-    launch_crm_experiment(server, 'crm_scenarios3', scenario_idx, num_samples, num_trials)
+sampling_timesteps = 48
+for idx, patient_ratio in patient_ratios:
+    server = servers[idx]
+    launch_experiment(server, 'gp_ratios_exp', scenario_idx, num_samples, sampling_timesteps, patient_ratio)

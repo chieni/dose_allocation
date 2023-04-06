@@ -81,6 +81,6 @@ def combine_files_sample_sizes(filepath):
             metric_frame[num_samples] = frames[idx][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
-copy_files('crm_scenarios2', 100, 2)
+copy_files('crm_scenarios4', 100, 2)
 # combine_files('exp_sample_size4')
 #combine_files_sample_sizes('gp_sample_size')

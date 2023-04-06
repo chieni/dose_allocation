@@ -160,7 +160,12 @@ class CRM:
                 Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
                 # Draw posterior samples
-                trace = pm.sample(5000, chains=1)
+                while True:
+                    try:
+                        trace = pm.sample(5000, chains=1)
+                    except pm.exceptions.SamplingError:
+                        continue
+                    break
                 alpha_trace = trace.posterior['alpha']
                 current_alpha_mean = np.mean(alpha_trace).item()
 
