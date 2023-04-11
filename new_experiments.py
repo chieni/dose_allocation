@@ -996,7 +996,7 @@ if __name__ == "__main__":
     increase_beta_param = False
     use_utility = False
     use_gpu = False
-    num_trials = 2
+    num_trials = 100
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()
