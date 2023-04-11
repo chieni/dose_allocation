@@ -32,16 +32,20 @@ scenarios = {
     19: DoseFindingScenarios.paper_example_19()
 }
 
-results_folder = "results/nineteenth_pass"
+results_folder = "results/gp_ratios_exp"
 num_trials = 100
 num_subgroups = 2
-scenario_utilities = np.empty((num_subgroups + 1, 19))
+scenario_utilities = np.empty((num_subgroups + 1, 18))
+patient_ratios = np.arange(0.1, 1.0, 0.05)
+patient_ratios = np.array([round(ratio, 2) for ratio in patient_ratios]).astype(str)
+dose_scenario = DoseFindingScenarios.paper_example_11()
 
-for scenario_idx, dose_scenario in scenarios.items():
+for idx, patient_ratio in enumerate(patient_ratios):
     trial_utilities = np.empty((num_subgroups + 1, num_trials))
 
     for trial_idx in range(num_trials):
-        trial_metrics = pd.read_csv(f"{results_folder}/scenario{scenario_idx}/trial{trial_idx}/timestep_metrics.csv")
+        # trial_metrics = pd.read_csv(f"{results_folder}/scenario{scenario_idx}/trial{trial_idx}/timestep_metrics.csv")
+        trial_metrics = pd.read_csv(f"{results_folder}/ratio{patient_ratio}/trial{trial_idx}/timestep_metrics.csv")
         selected_doses = trial_metrics['selected_dose']
         subgroup_indices = trial_metrics['subgroup_idx']
         selected_tox_probs = np.array([dose_scenario.get_toxicity_prob(arm_idx, group_idx) \
@@ -59,9 +63,10 @@ for scenario_idx, dose_scenario in scenarios.items():
 
         trial_utilities[num_subgroups, trial_idx] = utilities.mean()
 
-    scenario_utilities[:, scenario_idx-1] = trial_utilities.mean(axis=1)
+    scenario_utilities[:, idx] = trial_utilities.mean(axis=1)
 print(scenario_utilities)
 
-total_frame = pd.DataFrame(scenario_utilities, columns=[f"scenario{key}" for key in scenarios.keys()], index=['0', '1', 'overall'])
-total_frame.to_csv("results/nineteenth_pass/thall_utilities.csv")
+scenario_columns = [f"scenario{key}" for key in scenarios.keys()]
+total_frame = pd.DataFrame(scenario_utilities, columns=patient_ratios, index=['0', '1', 'overall'])
+total_frame.to_csv(f"{results_folder}/thall_utilities.csv")
 

@@ -2,7 +2,7 @@ import numpy as np
 import paramiko
 
 
-def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_timesteps):
+def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio):
     # Create an SSH client
     ssh = paramiko.SSHClient()
 
@@ -13,7 +13,7 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
     ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
 
     # Run a command 
-    exp_command = get_command(exp_name, scenario_num, num_samples, sampling_timesteps)
+    exp_command = get_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio)
     print(exp_command)
     stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {exp_command} >/dev/null 2>&1' ")
     # count = 0
@@ -105,7 +105,7 @@ patient_ratios = np.arange(0.1, 1.0, 0.05)
 scenario_idx = 11
 num_samples = 201
 num_trials = 100
-sampling_timesteps = 48
-for idx, patient_ratio in patient_ratios:
+sampling_timesteps = 69
+for idx, patient_ratio in enumerate(patient_ratios):
     server = servers[idx]
-    launch_experiment(server, 'gp_ratios_exp', scenario_idx, num_samples, sampling_timesteps, patient_ratio)
+    launch_experiment(server, 'gp_ratios_exp2', scenario_idx, num_samples, sampling_timesteps, patient_ratio)

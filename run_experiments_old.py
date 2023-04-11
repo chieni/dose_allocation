@@ -53,7 +53,7 @@ class ExperimentRunner:
         metrics_frame = pd.DataFrame({'subgroup': list(np.arange(num_subgroups)) + ['overall'],
                                       'safety violations': list(out_metrics.safety_violations.mean(axis=1)) + [out_metrics.safety_violations.mean()],
                                       'utility': list(out_metrics.utility_by_person.mean(axis=1)) + [out_metrics.utility_by_person.mean()],
-                                      'thall_utility': list(out_metrics.thall_utility.mean(axis=1)) + [out_metrics.utility_by_person.mean()],
+                                      'thall_utility': list(out_metrics.thall_utility.mean(axis=1)) + [out_metrics.thall_utility.mean()],
                                       'dose error by person': list(out_metrics.regret_by_person.mean(axis=1)) + [out_metrics.regret[:, -1, :].sum(axis=0).mean() / num_patients], # incorrect dose assignments
                                       'efficacy regret': list(out_metrics.eff_regret[:, -1, :].mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean()],
                                       'efficacy regret by person': list(out_metrics.eff_regret_by_person.mean(axis=1)) + [out_metrics.eff_regret[:, -1, :].mean() / num_patients],
@@ -251,7 +251,7 @@ class ExperimentRunner:
         exp_metrics = ExperimentMetrics(self.num_subgroups, self.num_doses, self.num_patients, self.reps, metrics_objects)
         p_hat_fin_mean = np.mean(exp_metrics.p_hat, axis=2)
         self.print_results(exp_metrics, filepath)
-
+        
         for idx in range(final_selected_doses.shape[1]):
             unique, counts = np.unique(final_selected_doses[:, idx], return_counts=True)
             print(f"Subgroup: {idx}")
@@ -400,7 +400,7 @@ if __name__ == "__main__":
     #     print(f"Num samples: {num_samples}")
     #     main2(scenario, num_samples, num_trials, filepath, patient_scenario, True)
 
-    folder_name = "c3t_ratios1000_2"
+    folder_name = "c3t_ratios1000_3"
     num_trials = 1000
     num_samples = 201
     scenario = DoseFindingScenarios.paper_example_11()

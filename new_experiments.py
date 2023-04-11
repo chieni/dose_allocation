@@ -59,12 +59,12 @@ class DoseExperimentMetrics:
         safety_violations = np.array(selected_tox_probs > dose_scenario.toxicity_threshold, dtype=np.int32)
 
         self.metrics_frame = pd.DataFrame({
-            'subgroup_idx': subgroup_indices,
+            'subgroup_idx': list(subgroup_indices),
             'tox_outcome': tox_outcomes,
             'eff_outcome': eff_outcomes,
             'selected_dose': selected_doses,
             'dose_error': dose_error,
-            'utility': utilities,
+            'utility': list(utilities.astype(np.float32)),
             'safety_violations': safety_violations
         })
 
@@ -996,7 +996,7 @@ if __name__ == "__main__":
     increase_beta_param = False
     use_utility = False
     use_gpu = False
-    num_trials = 100
+    num_trials = 2
     final_beta_param = 0.
 
     # dose_scenario = DoseFindingScenarios.paper_example_1()

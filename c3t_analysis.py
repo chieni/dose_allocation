@@ -36,7 +36,7 @@ import numpy as np
 #     metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
 
-filepath = "results/c3t_ratios1000_2"
+filepath = "results/c3t_ratios1000_3"
 patient_ratios = np.arange(0.1, 1.0, 0.05)
 frames = []
 for patient_ratio in patient_ratios:
@@ -48,6 +48,6 @@ metrics = ['safety violations', 'utility', 'thall_utility', 'dose error by perso
 for metric in metrics:
     metric_frame = pd.DataFrame(index = frames[0]['subgroup'].values)
     for idx, patient_ratio in enumerate(patient_ratios):
-        metric_frame[str(patient_ratio)] = frames[idx][metric].values
+        metric_frame[round(patient_ratio, 2)] = frames[idx][metric].values
 
     metric_frame.to_csv(f"{filepath}/{metric}.csv")

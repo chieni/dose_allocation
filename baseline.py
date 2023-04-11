@@ -176,29 +176,33 @@ if not os.path.exists(results_foldername):
 #     dose_error_dict[num_samples] = mean_frame['final_dose_error'].values.tolist()
 
 
-patient_ratios = np.arange(0.1, 1.0, 0.05)
-scenario_idx = 11
-dose_scenario = scenarios[scenario_idx]
-num_samples = 201
-num_trials = 100
-for patient_ratio in patient_ratios:
-    print(patient_ratio)
-    patient_scenario = TrialPopulationScenarios.skewed_dual_population(patient_ratio)
-    print(patient_scenario.arrival_rate)
-    mean_frame = three_plus_three_trials(num_trials, dose_scenario, num_samples, patient_scenario)
-    utility_dict[patient_ratio] = mean_frame['utilities'].values.tolist()
-    safety_dict[patient_ratio] = mean_frame['safety_violations'].values.tolist()
-    dose_error_dict[patient_ratio] = mean_frame['final_dose_error'].values.tolist()
+# patient_ratios = np.arange(0.1, 1.0, 0.05)
+# scenario_idx = 11
+# dose_scenario = scenarios[scenario_idx]
+# num_samples = 201
+# num_trials = 100
+# for patient_ratio in patient_ratios:
+#     print(patient_ratio)
+#     patient_scenario = TrialPopulationScenarios.skewed_dual_population(patient_ratio)
+#     print(patient_scenario.arrival_rate)
+#     mean_frame = three_plus_three_trials(num_trials, dose_scenario, num_samples, patient_scenario)
+#     utility_dict[patient_ratio] = mean_frame['utilities'].values.tolist()
+#     safety_dict[patient_ratio] = mean_frame['safety_violations'].values.tolist()
+#     dose_error_dict[patient_ratio] = mean_frame['final_dose_error'].values.tolist()
 
 
-utility_frame = pd.DataFrame(utility_dict)
-utility_frame.index = ['0', '1', 'overall']
-safety_frame = pd.DataFrame(safety_dict)
-safety_frame.index = ['0', '1', 'overall']
-dose_error_frame = pd.DataFrame(dose_error_dict)
-safety_frame.index = ['0', '1', 'overall']
+# utility_frame = pd.DataFrame(utility_dict)
+# utility_frame.index = ['0', '1', 'overall']
+# safety_frame = pd.DataFrame(safety_dict)
+# safety_frame.index = ['0', '1', 'overall']
+# dose_error_frame = pd.DataFrame(dose_error_dict)
+# safety_frame.index = ['0', '1', 'overall']
 
 
-utility_frame.to_csv(f"{results_foldername}/utility.csv")
-dose_error_frame.to_csv(f"{results_foldername}/final_ose_error.csv")
-safety_frame.to_csv(f"{results_foldername}/safety.csv")
+# utility_frame.to_csv(f"{results_foldername}/utility.csv")
+# dose_error_frame.to_csv(f"{results_foldername}/final_ose_error.csv")
+# safety_frame.to_csv(f"{results_foldername}/safety.csv")
+
+frame = pd.read_csv("results/three_baseline_ratios/utility.csv", index_col=0)
+frame.columns = [round(float(ratio), 2) for ratio in frame.columns]
+frame.to_csv("results/three_baseline_ratios/utility.csv")
