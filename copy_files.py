@@ -36,23 +36,31 @@ def copy_files(folder_name, num_trials, num_subgroups):
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
-            sftp.get(remote_file, local_file)
-        
-       # Download trial files
-        for trial in range(num_trials):
-            # local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
-            local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
-            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
-            for subgroup_idx in range(num_subgroups):
-                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
-                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+            try:
                 sftp.get(remote_file, local_file)
-            remote_file = f"{remote_path}/timestep_metrics.csv"
-            local_file = f"{local_path}/timestep_metrics.csv"
-            sftp.get(remote_file, local_file)
-
+            except:
+                continue
+        
+    #    # Download trial files
+    #     for trial in range(num_trials):
+    #         # local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
+    #         local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
+    #         if not os.path.exists(local_path):
+    #             os.makedirs(local_path)
+    #         remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+    #         for subgroup_idx in range(num_subgroups):
+    #             remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+    #             local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+    #             try:
+    #                 sftp.get(remote_file, local_file)
+    #             except:
+    #                 continue
+    #         remote_file = f"{remote_path}/timestep_metrics.csv"
+    #         local_file = f"{local_path}/timestep_metrics.csv"
+    #         try:
+    #             sftp.get(remote_file, local_file)
+    #         except:
+    #             continue
         sftp.close()
         client.close()
 
@@ -115,7 +123,7 @@ def combine_files_crm(filepath):
 
 patient_ratios = np.arange(0.1, 1.0, 0.05)
 
-#copy_files('gp_ratios_exp', 100, 2)
+copy_files('gp_ratios_exp3', 100, 2)
 # combine_files_ratios('gp_ratios_exp')
 #combine_files_sample_sizes('gp_sample_size')
-combine_files_crm('crm_scenarios3')
+#combine_files_crm('crm_scenarios3')

@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from sympy import symbols, solve, nsolve
-from parameterized_models import OQuiqleyModel, OneParamLogisticModel, PowerModel, SigmoidalModel, TwoParamLogisticModel
+from parameterized_models import OQuiqleyModel, OneParamLogisticModel, PowerModel, SigmoidalModel, TwoParamLogisticModel, NormalPDF
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -44,6 +44,13 @@ class DoseFindingScenario:
         expr = ((midpoint[1]/tox_threshold)**p + ((1. - midpoint[0]) / (1. - eff_threshold))**p)**(1./p)
         sol = nsolve(expr - 1, 2)
         return sol
+    
+    @staticmethod
+    def calculate_dose_utility_thall(tox_values, eff_values, tox_thre, eff_thre, p_param):
+        tox_term = (tox_values / tox_thre) ** p_param
+        eff_term = ((1. - eff_values) / (1. - eff_thre)) ** p_param
+        utilities = 1. - ( tox_term + eff_term ) ** (1. / p_param)
+        return utilities
 
     def plot_true_curves(self):
         dose_labels = self.dose_labels
@@ -65,14 +72,25 @@ class DoseFindingScenario:
         plt.ylabel('Response')
         plt.show()
 
-    def plot_true_subgroup_curves(self):
+    def plot_true_subgroup_curves(self, marker_val='o'):
         sns.set()
-        _, axs = plt.subplots(1, 2, figsize=(8, 4))
+        _, axs = plt.subplots(1, 3, figsize=(12, 4))
         axs[0].set_title(f"Toxicity")
         axs[1].set_title(f"Efficacy")
+        axs[2].set_title(f"Thall Utility")
+        utils = DoseFindingScenario.calculate_dose_utility_thall(self.toxicity_probs, self.efficacy_probs,
+                                                                 self.toxicity_threshold, self.efficacy_threshold,
+                                                                 self.p_param)
         for idx in range(self.num_subgroups):
-            axs[0].plot(self.dose_labels, self.toxicity_probs[idx, :], marker='o', label=f"Toxicity {idx}")
-            axs[1].plot(self.dose_labels, self.efficacy_probs[idx, :], marker='o', label=f"Efficacy {idx}")
+            axs[0].plot(self.dose_labels, self.toxicity_probs[idx, :], marker=marker_val, label=f"Toxicity {idx}")
+            axs[1].plot(self.dose_labels, self.efficacy_probs[idx, :], marker=marker_val, label=f"Efficacy {idx}")
+            axs[2].plot(self.dose_labels, utils[idx], marker=marker_val, label=f"Utility {idx}")
+            best_dose_idx = np.argmax(utils[idx])
+            best_dose = self.dose_labels[best_dose_idx]
+            axs[0].plot(best_dose, self.toxicity_probs[idx, best_dose_idx], marker='o', color='r')
+            axs[1].plot(best_dose,self.efficacy_probs[idx, best_dose_idx], marker='o', color='r')
+            axs[2].plot(best_dose, utils[idx, best_dose_idx], marker='o', color='r')
+
         axs[0].plot(self.dose_labels, np.repeat(self.toxicity_threshold, len(self.dose_labels)), 'm', label='Threshold')
         axs[1].plot(self.dose_labels, np.repeat(self.efficacy_threshold, len(self.dose_labels)), 'm', label='Threshold')
         axs[0].set_ylim([0, 1.1])
@@ -203,90 +221,141 @@ class DoseFindingScenarios:
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2)
     
     @staticmethod
-    def oquigley_subgroups_example_1():
-        # Subgroups requiring different doses
-        dose_range = (0.05, 20.)
-        eff_thre = 0.15
-        tox_thre = 0.6
-        midpoint = (0.25, 0.3) # (e, t)
+    def continuous_subgroups_example_1():
+        # Increasing toxicity, plateuing efficacy
+        dose_range = (2.5, 15.)
+        eff_thre = 0.25
+        tox_thre = 0.5
+        midpoint = (0.3, 0.4) # (e, t)
 
-        tox_model = OQuiqleyModel(0.8, resize_param=1/5, vertical_resize_param=1, auto_shift=True)
-        tox_model2 = OQuiqleyModel(1.0, resize_param=1/9, vertical_resize_param=1, auto_shift=True)
+        tox_model = OQuiqleyModel(0.8, resize_param=1/6, vertical_resize_param=1, auto_shift=True)
+        tox_model2 = OQuiqleyModel(0.8, resize_param=1/10, vertical_resize_param=1, auto_shift=True)
 
-        eff_model = OQuiqleyModel(0.8, resize_param=1/4, vertical_resize_param=0.9, auto_shift=True)
+        eff_model = OQuiqleyModel(0.8, resize_param=1/3, vertical_resize_param=0.7, auto_shift=True)
         eff_model2 = OQuiqleyModel(0.8, resize_param=1/3, vertical_resize_param=0.9, auto_shift=True)
 
-        dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        #dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        dose_labels = np.arange(dose_range[0], dose_range[1], 0.1, dtype=np.float32)
         toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels)),
                                    np.array(tox_model2.get_toxicity(dose_labels))))
         # Need efficacy models - plateau and monotonic
         efficacy_probs = np.stack((np.array(eff_model.get_toxicity(dose_labels)),
                                          np.array(eff_model2.get_toxicity(dose_labels))))
-        optimal_doses = np.array([2, 3])
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
+        thall_utilities = DoseFindingScenario.calculate_dose_utility_thall(toxicity_probs,
+                                                                           efficacy_probs,
+                                                                           tox_thre,
+                                                                           eff_thre,
+                                                                           p_param)
+        optimal_doses = np.array([np.argmax(thall_utilities[0]), np.argmax(thall_utilities[1])])
+        
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
                                    dose_range=dose_range, p_param=p_param)
     @staticmethod
-    def oquigley_subgroups_example_2():
-        # Subgroups with different maximum treatment effects
-        dose_range = (0.05, 60.)
+    def continuous_subgroups_example_2():
+        # Increasing tox, increasing eff
+        dose_range = (2.5, 40.)
+        eff_thre = 0.25
+        tox_thre = 0.5
+        midpoint = (0.3, 0.4) # (e, t)
 
-        tox_model = OQuiqleyModel(0.5, resize_param=1/12, vertical_resize_param=1.0, auto_shift=True)
-        tox_model2 = OQuiqleyModel(0.5, resize_param=1/12, vertical_resize_param=0.9, auto_shift=True)
+        tox_model = OQuiqleyModel(0.3, resize_param=1/16, vertical_resize_param=0.7, auto_shift=True)
+        tox_model2 = OQuiqleyModel(0.5, resize_param=1/16, vertical_resize_param=0.8, auto_shift=True)
 
-        eff_model = OQuiqleyModel(0.7, resize_param=1/12, vertical_resize_param=0.7, auto_shift=True)
-        eff_model2 = OQuiqleyModel(0.7, resize_param=1/12, vertical_resize_param=0.5, auto_shift=True)
+        eff_model = OQuiqleyModel(0.3, resize_param=1/16, vertical_resize_param=0.7, auto_shift=True)
+        eff_model2 = OQuiqleyModel(0.5, resize_param=1/16, vertical_resize_param=0.6, auto_shift=True)
 
-        dose_labels = np.array([2.5, 5., 10., 20., 35.], dtype=np.float32)
+        # dose_labels = np.array([2.5, 5., 10., 20., 35.], dtype=np.float32)
+        dose_labels = np.arange(dose_range[0], dose_range[1], 0.1, dtype=np.float32)
         toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels)),
                                    np.array(tox_model2.get_toxicity(dose_labels))))
 
         efficacy_probs = np.stack((np.array(eff_model.get_toxicity(dose_labels)),
-                                         np.array(eff_model2.get_toxicity(dose_labels))))
-        optimal_doses = np.array([3, 3])
-
+                                  np.array(eff_model2.get_toxicity(dose_labels))))
+        p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
+        thall_utilities = DoseFindingScenario.calculate_dose_utility_thall(toxicity_probs,
+                                                                           efficacy_probs,
+                                                                           tox_thre,
+                                                                           eff_thre,
+                                                                           p_param)
+        optimal_doses = np.array([np.argmax(thall_utilities[0]), np.argmax(thall_utilities[1])])
+        
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
-                                   dose_range=dose_range)
+                                   dose_range=dose_range, p_param=p_param)
 
     @staticmethod
-    def oquigley_subgroups_example_3():
+    def continuous_subgroups_example_3():
         # Tox models different, eff_model the same
         # Subgroups requiring different doses
-        dose_range = (0.05, 20.)
+        dose_range = (2.5, 20.)
         eff_thre = 0.15
-        tox_thre = 0.6
+        tox_thre = 0.35
         midpoint = (0.25, 0.3) # (e, t)
 
-        tox_model = OQuiqleyModel(0.8, resize_param=1/5, vertical_resize_param=1, auto_shift=True)
-        tox_model2 = OQuiqleyModel(1.0, resize_param=1/9, vertical_resize_param=1, auto_shift=True)
+        tox_model = OQuiqleyModel(1.0, resize_param=1/10, vertical_resize_param=0.9, auto_shift=True)
+        tox_model2 = OQuiqleyModel(1.0, resize_param=1/14, vertical_resize_param=1, auto_shift=True)
 
-        eff_model = OQuiqleyModel(0.8, resize_param=1/4, vertical_resize_param=0.9, auto_shift=True)
-        
+        # eff_model = OQuiqleyModel(0.8, resize_param=1/4, vertical_resize_param=0.9, auto_shift=True)
+        eff_model = NormalPDF(8, 3, vertical_resize_param=5)
         dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
-        # toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels, add_noise=True)),
-        #                            np.array(tox_model2.get_toxicity(dose_labels, add_noise=True))))
-       
-        # eff_probs = np.array(eff_model.get_toxicity(dose_labels, add_noise=True))
-        # efficacy_probs = np.stack((eff_probs, eff_probs))
-        
-        toxicity_probs = np.array([[0.10778783, 0.22129054, 0.4091505,  0.6372544,  0.9249991],
-                                   [0.08402434, 0.13784233, 0.21792966, 0.32690507, 0.61]])
-        efficacy_probs = np.array([[0.12902622, 0.2992084,  0.55055624, 0.75621295, 0.8858871 ],
-                                  [0.12902622, 0.2992084,  0.55055624, 0.75621295, 0.8858871 ]])
-        
-        optimal_doses = np.array([2, 3])
+        dose_labels = np.arange(dose_range[0], dose_range[1], 0.1, dtype=np.float32)
+        toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels)),
+                                   np.array(tox_model2.get_toxicity(dose_labels))))
+
+        efficacy_probs = np.stack((np.array(eff_model.get_toxicity(dose_labels)),
+                                  np.array(eff_model.get_toxicity(dose_labels))))
         p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
+        thall_utilities = DoseFindingScenario.calculate_dose_utility_thall(toxicity_probs,
+                                                                           efficacy_probs,
+                                                                           tox_thre,
+                                                                           eff_thre,
+                                                                           p_param)
+        optimal_doses = np.array([np.argmax(thall_utilities[0]), np.argmax(thall_utilities[1])])
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
                                    dose_range=dose_range, p_param=p_param)
+    
+    @staticmethod
+    def continuous_subgroups_example_4():
+        # Increasing toxicity (same), plateuing efficacy
+        dose_range = (0.05, 15.)
+        eff_thre = 0.25
+        tox_thre = 0.5
+        midpoint = (0.3, 0.4) # (e, t)
+
+        tox_model = OQuiqleyModel(0.8, resize_param=1/6, vertical_resize_param=1, auto_shift=True)
+        tox_model2 = OQuiqleyModel(0.8, resize_param=1/6, vertical_resize_param=1, auto_shift=True)
+
+        eff_model = OQuiqleyModel(0.8, resize_param=1/3, vertical_resize_param=0.7, auto_shift=True)
+        eff_model2 = OQuiqleyModel(0.8, resize_param=1/3, vertical_resize_param=0.9, auto_shift=True)
+
+        #dose_labels = np.array([2.5, 5.0, 7.5, 10., 15.], dtype=np.float32)
+        dose_labels = np.arange(0.5, 20, 0.1, dtype=np.float32)
+        toxicity_probs = np.stack((np.array(tox_model.get_toxicity(dose_labels)),
+                                   np.array(tox_model2.get_toxicity(dose_labels))))
+        # Need efficacy models - plateau and monotonic
+        efficacy_probs = np.stack((np.array(eff_model.get_toxicity(dose_labels)),
+                                         np.array(eff_model2.get_toxicity(dose_labels))))
+        p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
+        thall_utilities = DoseFindingScenario.calculate_dose_utility_thall(toxicity_probs,
+                                                                           efficacy_probs,
+                                                                           tox_thre,
+                                                                           eff_thre,
+                                                                           p_param)
+        optimal_doses = np.array([np.argmax(thall_utilities[0]), np.argmax(thall_utilities[1])])
+        return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
+                                   tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
+                                   dose_range=dose_range, p_param=p_param)
+    
     @staticmethod
     def subgroups_example_1():
         # Tox models different, eff_model the same
@@ -1311,11 +1380,8 @@ scenarios = {
     19: DoseFindingScenarios.paper_example_19()
 }
 
-# for key, scenario in scenarios.items():
-#     scenario.plot_paper_subgroup_curves(key)
 
-# scenario.plot_true_subgroup_curves()
-# scenario = DoseFindingScenarios.paper_example_5()
+
 # tox_thre = scenario.toxicity_threshold
 # eff_thre = scenario.efficacy_threshold
 # midpoint = (0.4, 0.35)

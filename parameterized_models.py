@@ -113,3 +113,18 @@ class TwoParamLogisticModel(ParameterizedModel):
     def initialize_dose_label(self, dose_skeleton):
         return (np.log(dose_skeleton / (1. - dose_skeleton)) - self.a) / np.exp(self.b)
 
+class NormalPDF(ParameterizedModel):
+    def __init__(self, mean, std, vertical_resize_param):
+        super().__init__()
+        self.mean = mean
+        self.std = std
+        self.vertical_resize_param = vertical_resize_param
+    
+    def get_toxicity(self, dose_label):
+        coeff = (1. / (self.std * np.sqrt(2. * np.pi)))
+        exp = np.exp(-0.5 * (((dose_label 
+                               - self.mean) / self.std)** 2))
+        return self.vertical_resize_param * coeff * exp
+    
+    def initialize_dose_label(self, dose_skeleton):
+        return
