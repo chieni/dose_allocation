@@ -63,8 +63,15 @@ class DoseExperimentMetrics:
             'safety_violations': safety_violations
         })
         dose_labels = dose_scenario.dose_labels
-        final_dose_diff = [dose_labels[int(final_selected_doses[idx])] - dose_labels[int(dose_scenario.optimal_doses[idx])] \
-                           for idx in range(self.num_subgroups)]
+        final_dose_vals = np.zeros(self.num_subgroups)
+        optimal_dose_vals = np.zeros(self.num_subgroups)
+        for subgroup_idx in range(self.num_subgroups):
+            if final_selected_doses[subgroup_idx] < dose_scenario.num_doses:
+                final_dose_vals[subgroup_idx] = dose_labels[int(final_selected_doses[subgroup_idx])]
+            if dose_scenario.optimal_doses[subgroup_idx] < dose_scenario.num_doses:
+                optimal_dose_vals[subgroup_idx] = dose_labels[int(dose_scenario.optimal_doses[subgroup_idx])]
+
+        final_dose_diff = final_dose_vals - optimal_dose_vals
         final_dose_diff_abs = np.abs(final_dose_diff)
 
         grouped_metrics_frame = self.metrics_frame.groupby(['subgroup_idx']).mean()
