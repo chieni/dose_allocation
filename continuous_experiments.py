@@ -143,9 +143,9 @@ def select_final_dose(num_subgroups, dose_labels, max_doses,
         available_doses_mask = (dose_labels <= max_dose + 3.)
 
         # Determine safe dose set on posterior means
-        tox_mean = tox_posteriors.mean[subgroup_idx, :]
-        tox_upper = tox_posteriors.upper[subgroup_idx, :]
-        eff_mean = eff_posteriors.mean[subgroup_idx, :]
+        tox_mean = np.copy(tox_posteriors.mean[subgroup_idx, :])
+        tox_upper = np.copy(tox_posteriors.upper[subgroup_idx, :])
+        eff_mean = np.copy(eff_posteriors.mean[subgroup_idx, :])
 
         tox_conf_interval = tox_upper - tox_mean
         tox_ucb = tox_mean + (final_beta_param * tox_conf_interval)
@@ -381,13 +381,12 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                               final_beta_param, 
                                                               dose_scenario.p_param,
                                                               use_thall)
-
     experiment_metrics = DoseExperimentMetrics(dose_scenario, patients, selected_doses,
                                                tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask],
                                                y_tox_posteriors.upper[:, x_mask], y_eff_posteriors.mean[:, x_mask],
                                                final_selected_doses, final_utilities)
     experiment_metrics.save_metrics(filepath)
-    
+
     # Calculate utilities
     util_func = np.empty((num_subgroups, len(np_x_test)))
     for subgroup_idx in range(num_subgroups):
@@ -396,8 +395,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                     dose_scenario.toxicity_threshold,
                                                     dose_scenario.efficacy_threshold,
                                                     dose_scenario.p_param)
-    print("Efficacy final")
-    print(y_eff_posteriors.mean)
+
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
             markevery, x_mask, f"{filepath}/final_gp_plot", dose_scenario.optimal_doses, marker_val='')
