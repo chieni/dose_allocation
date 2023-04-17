@@ -25,14 +25,17 @@ def copy_files(folder_name, num_trials, num_subgroups):
         # Create an SFTP client
         sftp = client.open_sftp()
 
-        remote_files = sftp.listdir(f"dose_allocation/results/{folder_name}")
-        matching_files = [file for file in remote_files if file.endswith(".csv") or file.endswith(".png")]
+        try:
+            remote_files = sftp.listdir(f"dose_allocation/results/{folder_name}")
+            matching_files = [file for file in remote_files if file.endswith(".csv") or file.endswith(".png")]
+        except:
+            continue
 
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            # path = f"results/{folder_name}/scenario{idx+1}"
-            path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            path = f"results/{folder_name}/scenario{idx+1}"
+            #path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
@@ -123,7 +126,8 @@ def combine_files_crm(filepath):
 
 patient_ratios = np.arange(0.1, 1.0, 0.05)
 
-copy_files('gp_ratios_exp3', 100, 2)
+# copy_files('gp_scenarios2', 100, 2)
+combine_files('gp_scenarios2')
 # combine_files_ratios('gp_ratios_exp')
 #combine_files_sample_sizes('gp_sample_size')
 #combine_files_crm('crm_scenarios3')

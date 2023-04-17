@@ -23,7 +23,7 @@ def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, out
     gp_melt['method'] = 'gp'
 
     # frame = pd.concat([c3t_melt, gp_melt, three_melt])
-    frame = pd.concat([crm_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -71,7 +71,7 @@ def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_fil
     gp_melt['method'] = 'gp'
 
     # frame = pd.concat([c3t_melt, gp_melt, three_melt])
-    frame = pd.concat([crm_melt, gp_melt])
+    frame = pd.concat([c3t_melt, gp_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -341,7 +341,7 @@ def ratios_plot(three_filename, c3t_filename, gp_filename):
 
 
 
-folder_name = "nineteenth_pass"
+folder_name = "gp_scenarios2"
 dose_filename = f"results/{folder_name}/final_dose_error.csv"
 thall_filename = f"results/{folder_name}/thall_final_dose_error_retrain.csv"
 safety_filename = f"results/{folder_name}/safety_violations.csv"
@@ -356,14 +356,14 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 #                 f"results/{c3t_folder_name}/final dose error.csv",
 #                 "results/crm_scenarios3/final_dose_error.csv",
 #                 dose_filename, f"results/{folder_name}/dose_comparison_9.png")
-# safety_plot(f"results/threeplusexp/safety.csv",
-#             f"results/{c3t_folder_name}/safety violations.csv",
-#             "results/crm_scenarios3/safety_violations.csv",
-#             safety_filename, f"results/{folder_name}/safety_comparison_9.png")
-utility_plot(f"results/threeplusexp/utility.csv",
-             f"results/{c3t_folder_name}/thall_utility.csv",
-             "results/crm_scenarios3/utilities.csv",
-             utility_filename, f"results/{folder_name}/utility_comparison_9.png")
+safety_plot(f"results/threeplusexp/safety.csv",
+            f"results/{c3t_folder_name}/safety violations.csv",
+            "results/crm_scenarios3/safety_violations.csv",
+            safety_filename, f"results/{folder_name}/safety_comparison_9.png")
+# utility_plot(f"results/threeplusexp/utility.csv",
+#              f"results/{c3t_folder_name}/thall_utility.csv",
+#              "results/crm_scenarios3/utilities.csv",
+#              utility_filename, f"results/{folder_name}/utility_comparison_9.png")
 
 
 

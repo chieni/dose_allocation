@@ -20,7 +20,7 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
     for line in iter(stdout.readline, ""):
         print(line, end="")
         count += 1
-        if count > 5:
+        if count > 1:
             break
 
     ssh.close()
@@ -62,7 +62,6 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
         '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
         '4.236.170.149','4.236.170.103', '172.174.224.64']
 
-
 # launch_experiment('172.174.178.62', 'exp24', 9, 51, 18)
 
 # For all scenarios
@@ -71,10 +70,8 @@ num_trials = 100
 sampling_timesteps = 18
 patient_ratio = 0.5
 for idx, server in enumerate(servers):
-    if idx == 0:
-        continue
     scenario_idx =  idx + 1
-    launch_experiment(server, 'gp_scenarios', scenario_idx, num_samples, sampling_timesteps,
+    launch_experiment(server, 'gp_scenarios2', scenario_idx, num_samples, sampling_timesteps,
                       patient_ratio, num_trials)
 
 # test_sample_nums = np.arange(375, 546, 9)

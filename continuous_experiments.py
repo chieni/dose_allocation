@@ -16,7 +16,7 @@ from data_generation import DoseFindingScenarios, TrialPopulationScenarios
 from new_gp import MultitaskClassificationRunner, MultitaskGPModel
 from plots import plot_gp, plot_gp_timestep, plot_gp_trials
 from experiment_utils import PosteriorPrediction
-from new_experiments import DoseExperimentMetrics, calculate_utility_thall, get_bernoulli_confidence_region
+from new_experiments_clean import DoseExperimentMetrics, calculate_utility_thall, get_bernoulli_confidence_region
 
 
 def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples, use_gpu):
@@ -25,7 +25,6 @@ def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples,
 
     for subgroup_idx in range(num_subgroups):
         test_task_indices = torch.LongTensor(np.repeat(subgroup_idx, len(x_test)))
-
         post_latents, _ = runner.predict(x_test, test_task_indices, use_gpu)
         mean, lower, upper, variance = get_bernoulli_confidence_region(post_latents, runner.likelihood, num_confidence_samples)
         latent_lower, latent_upper = post_latents.confidence_region()
@@ -334,12 +333,12 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         plot_gp_timestep(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
                          num_subgroups, np_x_test, y_tox_posteriors, y_eff_posteriors, 
                          tox_acqui_funcs, eff_acqui_funcs, util_func, selected_dose_by_subgroup,
-                         markevery, x_mask, f"{plots_filepath}/timestep{timestep}")
+                         markevery, x_mask, f"{plots_filepath}/timestep{timestep}", marker_val='')
 
         plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:timestep],
                 patient_scenario.num_subgroups, np_x_test, y_tox_latents, y_eff_latents,
                 util_func, selected_dose_by_subgroup, markevery, x_mask,
-                f"{latent_plots_filepath}/timestep{timestep}", dose_scenario.optimal_doses)
+                f"{latent_plots_filepath}/timestep{timestep}", dose_scenario.optimal_doses, marker_val='')
         
         timestep += cohort_size
 
@@ -367,6 +366,8 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
     # Get model predictions
     y_tox_posteriors, y_tox_latents = get_model_predictions(tox_runner, patient_scenario.num_subgroups,
                                                             x_test, num_confidence_samples, use_gpu)
+    
+    
     y_eff_posteriors, y_eff_latents = get_model_predictions(eff_runner, patient_scenario.num_subgroups,
                                                             x_test, num_confidence_samples, use_gpu)
 
@@ -395,13 +396,14 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                     dose_scenario.toxicity_threshold,
                                                     dose_scenario.efficacy_threshold,
                                                     dose_scenario.p_param)
-
+    print("Efficacy final")
+    print(y_eff_posteriors.mean)
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
-            markevery, x_mask, f"{filepath}/final_gp_plot", dose_scenario.optimal_doses)
+            markevery, x_mask, f"{filepath}/final_gp_plot", dose_scenario.optimal_doses, marker_val='')
     plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
             np_x_test, y_tox_latents, y_eff_latents, util_func, final_selected_doses,
-            markevery, x_mask, f"{filepath}/final_gp_latents_plot", dose_scenario.optimal_doses)
+            markevery, x_mask, f"{filepath}/final_gp_latents_plot", dose_scenario.optimal_doses, marker_val='')
     
     return experiment_metrics, y_tox_posteriors, y_eff_posteriors, util_func
 
@@ -470,6 +472,7 @@ def parse_args():
     parser.add_argument("--use_thall", action="store_true", help="Use Thall utility.")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     parser.add_argument("--group_ratio", type=float, help="Subgroup skew.")
+    parser.add_argument("--num_trials", type=int, help="Number of trials")
     args = parser.parse_args()
 
     scenarios = {
@@ -496,18 +499,18 @@ def parse_args():
     use_thall = args.use_thall
     run_one = args.run_one
     group_ratio = args.group_ratio
+    num_trials = args.num_trials
     return filepath, scenarios[scenario], beta_param, num_samples, sampling_timesteps,\
-           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio
+           tox_lengthscale, eff_lengthscale, tox_mean, eff_mean, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio, num_trials
 
 
 if __name__ == "__main__":
     filepath, dose_scenario, beta_param, num_samples, sampling_timesteps, tox_lengthscale_init, \
-        eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio = parse_args()
+        eff_lengthscale_init, tox_mean_init, eff_mean_init, learning_rate, num_latents, use_lcb_init, use_lcb_exp, set_lmc, use_thall, run_one, group_ratio, num_trials = parse_args()
 
     increase_beta_param = False
     use_utility = False
     use_gpu = False
-    num_trials = 100
     final_beta_param = 0.
 
     patient_scenario = TrialPopulationScenarios.skewed_dual_population(group_ratio)

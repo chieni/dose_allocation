@@ -74,7 +74,7 @@ class DoseFindingScenario:
 
     def plot_true_subgroup_curves(self, marker_val='o'):
         sns.set()
-        _, axs = plt.subplots(1, 3, figsize=(12, 4))
+        _, axs = plt.subplots(1, 3, figsize=(14, 4))
         axs[0].set_title(f"Toxicity")
         axs[1].set_title(f"Efficacy")
         axs[2].set_title(f"Thall Utility")
@@ -95,8 +95,11 @@ class DoseFindingScenario:
         axs[1].plot(self.dose_labels, np.repeat(self.efficacy_threshold, len(self.dose_labels)), 'm', label='Threshold')
         axs[0].set_ylim([0, 1.1])
         axs[1].set_ylim([0, 1.1])
-        plt.xlabel('Dose Labels')
-        plt.ylabel('Response')
+        axs[0].set_xlabel('Dose Labels')
+        axs[0].set_ylabel('Response Probability')
+        axs[1].set_xlabel('Dose Labels')
+        axs[1].set_ylabel('Response Probability')
+        plt.tight_layout()
         plt.legend()
         plt.show()
     
@@ -1382,9 +1385,5 @@ scenarios = {
 
 
 
-# tox_thre = scenario.toxicity_threshold
-# eff_thre = scenario.efficacy_threshold
-# midpoint = (0.4, 0.35)
-# p_param = DoseFindingScenario.calculate_utility_param(tox_thre, eff_thre, midpoint)
-# print(p_param)
-# scenario.plot_true_subgroup_curves()
+# scenario = DoseFindingScenarios.continuous_subgroups_example_4()
+# scenario.plot_true_subgroup_curves(marker_val='')
