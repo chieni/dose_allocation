@@ -48,19 +48,19 @@ def launch_continuous_experiment(hostname, exp_name, scenario_num, num_samples, 
 
     ssh.close()
 
-def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, num_trials):
+def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, group_ratio, num_trials):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
-    crm_command = get_crm_command(exp_name, scenario_num, num_samples, num_trials)
+    crm_command = get_crm_command(exp_name, scenario_num, num_samples, group_ratio, num_trials)
     print(crm_command)
     stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {crm_command} >/dev/null 2>&1' ")
-    # count = 0
-    # for line in iter(stderr.readline, ""):
-    #     print(line, end="")
-    #     count += 1
-    #     if count > 20:
-    #         break
+    count = 0
+    for line in iter(stdout.readline, ""):
+        print(line, end="")
+        count += 1
+        if count > 1:
+            break
     ssh.close()
 
 
