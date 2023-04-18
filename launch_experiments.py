@@ -25,6 +25,26 @@ def launch_experiment(hostname, exp_name, scenario_num, num_samples, sampling_ti
 
     ssh.close()
 
+def kill_experiment(hostname):
+    # Create an SSH client
+    ssh = paramiko.SSHClient()
+
+    # Add the remote server's SSH key to the local SSH client
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    # Connect to the remote server
+    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
+
+    stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'pkill python' ")
+    count = 0
+    for line in iter(stderr.readline, ""):
+        print(line, end="")
+        count += 1
+        if count > 1:
+            break
+
+    ssh.close()
+
 def launch_continuous_experiment(hostname, exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio, num_trials):
     # Create an SSH client
     ssh = paramiko.SSHClient()
@@ -152,9 +172,13 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 #     launch_experiment(server, 'gp_ratios_exp3', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
 
 patient_ratios = np.arange(0.1, 1.0, 0.05)
-scenario_idx = 11
-num_samples = 201
-num_trials = 100
+# scenario_idx = 11
+# num_samples = 201
+# num_trials = 100
+# for idx, patient_ratio in enumerate(patient_ratios):
+#     server = servers[idx]
+#     launch_crm_experiment(server, 'crm_ratios2', scenario_idx, num_samples, patient_ratio, num_trials)
+
 for idx, patient_ratio in enumerate(patient_ratios):
     server = servers[idx]
-    launch_crm_experiment(server, 'crm_ratios', scenario_idx, num_samples, patient_ratio, num_trials)
+    kill_experiment(server)

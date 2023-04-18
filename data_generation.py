@@ -257,19 +257,20 @@ class DoseFindingScenarios:
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
                                    dose_range=dose_range, p_param=p_param)
+
     @staticmethod
     def continuous_subgroups_example_2():
         # Increasing tox, increasing eff
         dose_range = (2.5, 40.)
         eff_thre = 0.25
-        tox_thre = 0.5
-        midpoint = (0.3, 0.4) # (e, t)
+        tox_thre = 0.4
+        midpoint = (0.3, 0.3) # (e, t)
 
-        tox_model = OQuiqleyModel(0.3, resize_param=1/16, vertical_resize_param=0.7, auto_shift=True)
-        tox_model2 = OQuiqleyModel(0.5, resize_param=1/16, vertical_resize_param=0.8, auto_shift=True)
+        tox_model = OQuiqleyModel(0.3, resize_param=1/10, vertical_resize_param=0.7, auto_shift=True)
+        tox_model2 = OQuiqleyModel(0.3, resize_param=1/10, vertical_resize_param=0.7, auto_shift=True)
 
-        eff_model = OQuiqleyModel(0.3, resize_param=1/16, vertical_resize_param=0.7, auto_shift=True)
-        eff_model2 = OQuiqleyModel(0.5, resize_param=1/16, vertical_resize_param=0.6, auto_shift=True)
+        eff_model = OQuiqleyModel(0.3, resize_param=1/6, vertical_resize_param=1.0, auto_shift=True)
+        eff_model2 = OQuiqleyModel(0.3, resize_param=1/8, vertical_resize_param=0.9, auto_shift=True)
 
         # dose_labels = np.array([2.5, 5., 10., 20., 35.], dtype=np.float32)
         dose_labels = np.arange(dose_range[0], dose_range[1], 0.1, dtype=np.float32)
@@ -288,7 +289,7 @@ class DoseFindingScenarios:
         
         
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
-                                   optimal_doses, toxicity_threshold=0.35, efficacy_threshold=0.2,
+                                   optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
                                    dose_range=dose_range, p_param=p_param)
 
@@ -1385,5 +1386,5 @@ scenarios = {
 
 
 
-# scenario = DoseFindingScenarios.continuous_subgroups_example_4()
+# scenario = DoseFindingScenarios.continuous_subgroups_example_2()
 # scenario.plot_true_subgroup_curves(marker_val='')

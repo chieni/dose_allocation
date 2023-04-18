@@ -78,7 +78,6 @@ class CRM:
         if add_jitter:
             for dose_idx in range(dose_skeleton.shape[0]):
                 dose_skeleton[dose_idx] = self.jitter_dose_skeleton(dose_skeleton[dose_idx])
-            print(dose_skeleton)
         dose_labels = CRM.init_tangent_labels(dose_skeleton, a0)
         patients = patients.astype(int)
 
@@ -102,6 +101,7 @@ class CRM:
         X = np.array(selected_dose_values).astype(np.float32)
         Y = np.array(tox_outcomes).astype(np.float32)
 
+        print("Initialize model")
         model = pm.Model()
         with model:
             # Prior of parameters
@@ -122,8 +122,6 @@ class CRM:
 
         while timestep < self.num_patients:
             predicted_toxicities = CRM.tangent_model(dose_labels, current_alpha_mean)
-            print(current_alpha_mean)
-            print(predicted_toxicities)
 
             selected_dose = np.abs(np.array(predicted_toxicities) - dose_scenario.toxicity_threshold).argmin()
             if selected_dose > max_dose + 1:
@@ -146,7 +144,6 @@ class CRM:
 
             X = np.array(selected_dose_values).astype(np.float32)
             Y = np.array(tox_outcomes).astype(np.float32)
-            print(X, Y)
 
             model = pm.Model()
             with model:
@@ -160,20 +157,14 @@ class CRM:
                 Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
                 # Draw posterior samples
-                while True:
-                    try:
-                        trace = pm.sample(5000, chains=1)
-                    except pm.exceptions.SamplingError:
-                        continue
-                    break
+                trace = pm.sample(5000, chains=1)
                 alpha_trace = trace.posterior['alpha']
                 current_alpha_mean = np.mean(alpha_trace).item()
 
             timestep += cohort_size
 
         final_model_toxicities = CRM.tangent_model(dose_labels, current_alpha_mean)
-        print(current_alpha_mean)
-        print(final_model_toxicities)
+        print(f"Final model toxicities: {final_model_toxicities}")
         print(f"True tox: {dose_scenario.toxicity_probs}")
 
         final_selected_doses = np.empty(num_subgroups)
@@ -295,7 +286,6 @@ class CRM:
 
             X = np.array(selected_dose_values).astype(np.float32)
             Y = np.array(tox_outcomes).astype(np.float32)
-            print(X, Y)
 
             model = pm.Model()
             with model:
@@ -388,16 +378,21 @@ def run_trials(results_foldername, dose_scenario, num_patients, group_ratio, num
     metrics_list = []
     final_selected_doses = np.empty((num_trials, num_subgroups))
     for trial_idx in range(num_trials):
+        print(f"Trial {trial_idx}")
         patients = patient_scenario.generate_samples(num_patients)
-        trial_metrics, trial_selected_doses = crm.run_trial(dose_scenario, patients, patient_scenario.num_subgroups,
-                                                            f"{results_foldername}/trial{trial_idx}", add_jitter)
+        while True:
+            try:
+                trial_metrics, trial_selected_doses = crm.run_trial(dose_scenario, patients, patient_scenario.num_subgroups,
+                                                                    f"{results_foldername}/trial{trial_idx}", add_jitter)
+            except:
+                continue
+            break
         metrics_list.append(trial_metrics)
         final_selected_doses[trial_idx] = trial_selected_doses
     
     frame = pd.concat([df for df in metrics_list])
     grouped_frame = frame.groupby(frame.index)
     mean_frame = grouped_frame.mean()
-    var_frame = grouped_frame.var()
     mean_frame.to_csv(f"{results_foldername}/overall_metrics.csv")
 
     doses_frame = pd.DataFrame(final_selected_doses)

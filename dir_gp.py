@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import torch
 import gpytorch
 import tqdm
@@ -27,19 +28,37 @@ class MultitaskICMGPModel(gpytorch.models.ExactGP):
         return gpytorch.distributions.MultivariateNormal(mean_x, covar)
 
 class DirichletRunner:
-    def __init__(self, train_x, train_y, train_i):
+    def __init__(self, train_x, train_y, train_i, mean_init, lengthscale_init):
         self.likelihood = gpytorch.likelihoods.DirichletClassificationLikelihood(train_y, learn_additional_noise=True)
         self.model = MultitaskICMGPModel((train_x, train_i), self.likelihood.transformed_targets, self.likelihood, num_classes=2)
+        self.train_x = train_x
+        self.train_y = train_y
+        self.train_i = train_i
+        self.mean_init = mean_init
+        self.lengthscale_init = lengthscale_init
 
-    def train(self, train_x, train_i, num_epochs, learning_rate=0.1):
+    def train(self, num_epochs, learning_rate=0.1):
         self.model.train()
         self.likelihood.train()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
+
+        model_params = self.model.parameters()
+        self.model.mean_module.constant = self.mean_init
+        self.model.covar_module.lengthscale = self.lengthscale_init
+        covar_factor = torch.tensor([[0.8, 0.2], [0.8, 0.2]])
+        self.model.task_covar_module.covar_factor = torch.nn.Parameter(covar_factor)
+        self.model.task_covar_module.raw_var = torch.nn.Parameter(torch.tensor([[0.9, 0.9], [0.9, 0.9]]))
+
+        model_params = list(set(model_params) - {self.model.mean_module.raw_constant})
+        model_params = list(set(model_params) - {self.model.covar_module.raw_lengthscale})
+        model_params = list(set(model_params) - {self.model.task_covar_module.covar_factor})
+        model_params = list(set(model_params) - {self.model.task_covar_module.raw_var})
+    
+        optimizer = torch.optim.Adam(model_params, lr=learning_rate)
         mll = gpytorch.mlls.ExactMarginalLogLikelihood(self.likelihood, self.model)
 
         for i in range(num_epochs):
             optimizer.zero_grad()
-            output = self.model(train_x, train_i)
+            output = self.model(self.train_x, self.train_i)
             loss = -mll(output, self.likelihood.transformed_targets).sum()
             loss.backward()
             print('Iter %d/50 - Loss: %.3f' % (i + 1, loss.item()))
@@ -54,10 +73,10 @@ class DirichletRunner:
 
         return test_dist
 
-    def get_posterior_estimate(self, posterior_dist, num_samples=256):
-        samples = posterior_dist.sample(torch.Size((num_samples,))).exp()
+    def get_posterior_estimate(self, posterior_dist, num_confidence_samples=100):
+        samples = posterior_dist.sample(torch.Size((num_confidence_samples,))).exp()
         probabilities = (samples / samples.sum(-2, keepdim=True)).mean(0)
-        return probabilities
+        return np.clip(probabilities, 0., 1.)
 
 # Define plotting function
 def ax_plot(ax, train_y, train_x, posterior_probs, test_x, title):
