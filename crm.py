@@ -378,11 +378,11 @@ def run_one_trial(results_foldername, dose_scenario, num_patients, add_jitter):
     crm.run_trial(dose_scenario, patients, patient_scenario.num_subgroups, results_foldername, add_jitter)
 
 
-def run_trials(results_foldername, dose_scenario, num_patients, num_trials, add_jitter):
+def run_trials(results_foldername, dose_scenario, num_patients, group_ratio, num_trials, add_jitter):
     if not os.path.exists(results_foldername):
         os.makedirs(results_foldername)
     num_subgroups = 2
-    patient_scenario = TrialPopulationScenarios.equal_population(num_subgroups)
+    patient_scenario = TrialPopulationScenarios.skewed_dual_population(group_ratio)
 
     crm = CRM(num_patients)
     metrics_list = []
@@ -409,6 +409,7 @@ def parse_args():
     parser.add_argument("--filepath", type=str, help="File path name")
     parser.add_argument("--scenario", type=int, help="Dose scenario")
     parser.add_argument("--num_samples", type=int, help="Number of samples.")
+    parser.add_argument("--group_ratio", type=float, help="Subgroup ratio")
     parser.add_argument("--num_trials", type=int, help="Number of trials.")
     parser.add_argument("--run_one", action="store_true", help="Run just one iteration")
     parser.add_argument("--add_jitter", action="store_true", help="Jitter dose skeleton labels")
@@ -439,19 +440,20 @@ def parse_args():
     filepath = args.filepath
     scenario = scenarios[args.scenario]
     num_samples = args.num_samples
+    group_ratio = args.group_ratio
     num_trials = args.num_trials
     run_one = args.run_one
     add_jitter = args.add_jitter
-    return filepath, scenario, num_samples, num_trials, run_one, add_jitter
+    return filepath, scenario, num_samples, group_ratio, num_trials, run_one, add_jitter
 
 if __name__ == "__main__":
 
     # python crm.py --filepath results/crm_exp7 --scenario 1 --num_samples 51 --num_trials 1 --add_jitter
-    filepath, scenario, num_samples, num_trials, run_one, add_jitter = parse_args()
+    filepath, scenario, num_samples, group_ratio, num_trials, run_one, add_jitter = parse_args()
 
     if run_one:
         run_one_trial(filepath, scenario, num_samples, add_jitter)
     else:
-        run_trials(filepath, scenario, num_samples, num_trials, add_jitter)
+        run_trials(filepath, scenario, num_samples, group_ratio, num_trials, add_jitter)
 
 

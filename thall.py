@@ -12,12 +12,12 @@ def calculate_dose_utility_thall(tox_values, eff_values, tox_thre, eff_thre, p_p
     return utilities
 
 
-scenario = DoseFindingScenarios.continuous_subgroups_example_3()
-thall_utilities = calculate_dose_utility_thall(scenario.toxicity_probs, scenario.efficacy_probs,
-                                                scenario.toxicity_threshold,
-                                                scenario.efficacy_threshold,
-                                                scenario.p_param)
-print(thall_utilities)
-print(scenario.dose_labels[np.argmax(thall_utilities[0])])
-print(scenario.dose_labels[np.argmax(thall_utilities[1])])
-scenario.plot_true_subgroup_curves(marker_val='.')
+# scenario = DoseFindingScenarios.continuous_subgroups_example_3()
+# thall_utilities = calculate_dose_utility_thall(scenario.toxicity_probs, scenario.efficacy_probs,
+#                                                 scenario.toxicity_threshold,
+#                                                 scenario.efficacy_threshold,
+#                                                 scenario.p_param)
+# print(thall_utilities)
+# print(scenario.dose_labels[np.argmax(thall_utilities[0])])
+# print(scenario.dose_labels[np.argmax(thall_utilities[1])])
+# scenario.plot_true_subgroup_curves(marker_val='.')
