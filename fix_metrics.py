@@ -32,41 +32,61 @@ scenarios = {
     19: DoseFindingScenarios.paper_example_19()
 }
 
-results_folder = "results/gp_ratios_exp"
+filepath = "results/gp_continuous2"
 num_trials = 100
 num_subgroups = 2
-scenario_utilities = np.empty((num_subgroups + 1, 18))
-patient_ratios = np.arange(0.1, 1.0, 0.05)
-patient_ratios = np.array([round(ratio, 2) for ratio in patient_ratios]).astype(str)
-dose_scenario = DoseFindingScenarios.paper_example_11()
+dose_scenario = DoseFindingScenarios.continuous_subgroups_example_2()
 
-for idx, patient_ratio in enumerate(patient_ratios):
-    trial_utilities = np.empty((num_subgroups + 1, num_trials))
+metrics_list = []
 
-    for trial_idx in range(num_trials):
-        # trial_metrics = pd.read_csv(f"{results_folder}/scenario{scenario_idx}/trial{trial_idx}/timestep_metrics.csv")
-        trial_metrics = pd.read_csv(f"{results_folder}/ratio{patient_ratio}/trial{trial_idx}/timestep_metrics.csv")
-        selected_doses = trial_metrics['selected_dose']
-        subgroup_indices = trial_metrics['subgroup_idx']
-        selected_tox_probs = np.array([dose_scenario.get_toxicity_prob(arm_idx, group_idx) \
-                                       for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
-        selected_eff_probs = np.array([dose_scenario.get_efficacy_prob(arm_idx, group_idx) \
-                                       for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
+for trial_idx in range(num_trials):
+    # trial_metrics = pd.read_csv(f"{results_folder}/scenario{scenario_idx}/trial{trial_idx}/timestep_metrics.csv")
+    grouped_metrics_frame = pd.read_csv(f"{filepath}/trial{trial_idx}/overall_metrics.csv")
+    final_dose_rec_frame = pd.read_csv(f"{filepath}/trial{trial_idx}/final_dose_rec.csv")
+    final_dose_diff = final_dose_rec_frame['final_dose_diff']
+    final_dose_diff_abs = final_dose_rec_frame['final_dose_diff_abs']
+    grouped_metrics_frame['final_dose_diff'] =  np.concatenate([final_dose_diff, [sum(final_dose_diff) / num_subgroups]])
+    grouped_metrics_frame['final_dose_diff_abs'] = np.concatenate([final_dose_diff_abs, [sum(final_dose_diff_abs) / num_subgroups]])
 
-        utilities = calculate_utility_thall(selected_tox_probs, selected_eff_probs,
-                                            dose_scenario.toxicity_threshold, dose_scenario.efficacy_threshold,
-                                            dose_scenario.p_param)
-        
-        for subgroup_idx in range(num_subgroups):
-            subgroup_mask = (subgroup_indices == subgroup_idx)
-            trial_utilities[subgroup_idx, trial_idx] = utilities[subgroup_mask].mean()
+    metrics_list.append(grouped_metrics_frame)
+    # selected_doses = trial_metrics['selected_dose']
+    # subgroup_indices = trial_metrics['subgroup_idx']
+    # selected_tox_probs = np.array([dose_scenario.get_toxicity_prob(arm_idx, group_idx) \
+    #                                for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
+    # selected_eff_probs = np.array([dose_scenario.get_efficacy_prob(arm_idx, group_idx) \
+    #                                for arm_idx, group_idx in zip(selected_doses, subgroup_indices)])
 
-        trial_utilities[num_subgroups, trial_idx] = utilities.mean()
+    # utilities = calculate_utility_thall(selected_tox_probs, selected_eff_probs,
+    #                                     dose_scenario.toxicity_threshold, dose_scenario.efficacy_threshold,
+    #                                     dose_scenario.p_param)
+    
+    # for subgroup_idx in range(num_subgroups):
+    #     subgroup_mask = (subgroup_indices == subgroup_idx)
+    #     trial_utilities[subgroup_idx, trial_idx] = utilities[subgroup_mask].mean()
 
-    scenario_utilities[:, idx] = trial_utilities.mean(axis=1)
-print(scenario_utilities)
+    # trial_utilities[num_subgroups, trial_idx] = utilities.mean()
 
-scenario_columns = [f"scenario{key}" for key in scenarios.keys()]
-total_frame = pd.DataFrame(scenario_utilities, columns=patient_ratios, index=['0', '1', 'overall'])
-total_frame.to_csv(f"{results_folder}/thall_utilities.csv")
+frame = pd.concat([df for df in metrics_list])
+grouped_frame = frame.groupby(frame.index)
+mean_frame = grouped_frame.mean()
+var_frame = grouped_frame.var()
+mean_frame = mean_frame[['tox_outcome', 'eff_outcome', 'utility', 'safety_violations',
+                            'dose_error', 'final_dose_error', 'final_dose_diff', 'final_dose_diff_abs']]
+var_frame = var_frame[['tox_outcome', 'eff_outcome', 'utility', 'safety_violations',
+                        'dose_error', 'final_dose_error', 'final_dose_diff', 'final_dose_diff_abs']]
+
+print(mean_frame)
+print(var_frame)
+mean_frame.to_csv(f"{filepath}/final_metric_means.csv")
+var_frame.to_csv(f"{filepath}/final_metric_var.csv")
+
+# dose_counts = pd.concat([df.dose_counts_frame for df in metrics_list])
+# dose_counts_mean = dose_counts.groupby(level=0).mean()
+# print(dose_counts_mean)
+# dose_counts_mean.to_csv(f"{filepath}/all_dose_counts.csv")
+
+# dose_recs = pd.concat([df.final_dose_rec for df in metrics_list])
+# dose_recs_grouped = dose_recs.groupby('subgroup_idx')['final_dose_rec'].value_counts()
+# print(dose_recs_grouped)
+# dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
 

@@ -136,15 +136,17 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 #     launch_continuous_experiment(server, 'gp_continuous_scenarios', scenario_idx, num_samples, sampling_timesteps,
 #                       patient_ratio, num_trials)
 
-
-# test_sample_nums = np.arange(375, 546, 9)
-# scenario_idx = 9 # scenario 9
-# for idx, num_samples in enumerate(test_sample_nums):
-#     server = servers[idx]
-#     #sampling_timesteps = 18 + (idx * 3)
-#     sampling_timesteps = int((18/51) * num_samples)
-#     print(num_samples, sampling_timesteps)
-#     launch_experiment(server, 'exp_sample_size4', scenario_idx, num_samples, sampling_timesteps)
+test_sample_nums = np.arange(60, 240, 9)
+#test_sample_nums = np.arange(375, 546, 9)
+scenario_idx = 9 # scenario 9
+patient_ratio = 0.5
+num_trials = 100
+for idx, num_samples in enumerate(test_sample_nums):
+    server = servers[idx]
+    sampling_timesteps = int((18/51) * num_samples)
+    print(num_samples, sampling_timesteps)
+    #launch_experiment(server, 'gp_sample_exp', scenario_idx, num_samples, sampling_timesteps)
+    launch_crm_experiment(server, 'crm_sample_exp', scenario_idx, num_samples, patient_ratio, num_trials)
 
 # For all scenarios CRM
 # num_samples = 51
@@ -171,7 +173,7 @@ servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','1
 #     server = servers[idx]
 #     launch_experiment(server, 'gp_ratios_exp3', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
 
-patient_ratios = np.arange(0.1, 1.0, 0.05)
+# patient_ratios = np.arange(0.1, 1.0, 0.05)
 # scenario_idx = 11
 # num_samples = 201
 # num_trials = 100
@@ -179,6 +181,6 @@ patient_ratios = np.arange(0.1, 1.0, 0.05)
 #     server = servers[idx]
 #     launch_crm_experiment(server, 'crm_ratios2', scenario_idx, num_samples, patient_ratio, num_trials)
 
-for idx, patient_ratio in enumerate(patient_ratios):
-    server = servers[idx]
-    kill_experiment(server)
+# for idx, patient_ratio in enumerate(patient_ratios):
+#     server = servers[idx]
+#     kill_experiment(server)

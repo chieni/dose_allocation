@@ -34,8 +34,8 @@ def copy_files(folder_name, num_trials, num_subgroups):
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            path = f"results/{folder_name}/scenario{idx+1}"
-            #path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            #path = f"results/{folder_name}/scenario{idx+1}"
+            path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
@@ -45,25 +45,26 @@ def copy_files(folder_name, num_trials, num_subgroups):
                 continue
         
        # Download trial files
-        for trial in range(num_trials):
-            local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
-            #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
-            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
-            for subgroup_idx in range(num_subgroups):
-                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
-                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
-                try:
-                    sftp.get(remote_file, local_file)
-                except:
-                    continue
-            remote_file = f"{remote_path}/timestep_metrics.csv"
-            local_file = f"{local_path}/timestep_metrics.csv"
-            try:
-                sftp.get(remote_file, local_file)
-            except:
-                continue
+        # for trial in range(num_trials):
+        #     local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
+        #     #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
+        #     if not os.path.exists(local_path):
+        #         os.makedirs(local_path)
+        #     remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+        #     for subgroup_idx in range(num_subgroups):
+        #         remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+        #         local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+        #         try:
+        #             sftp.get(remote_file, local_file)
+        #         except:
+        #             continue
+        #     remote_file = f"{remote_path}/timestep_metrics.csv"
+        #     local_file = f"{local_path}/timestep_metrics.csv"
+        #     try:
+        #         sftp.get(remote_file, local_file)
+        #     except:
+        #         continue
+
         sftp.close()
         client.close()
 
@@ -75,6 +76,21 @@ def combine_files(filepath):
         frame = pd.read_csv(f"{filepath}/scenario{scenario}/final_metric_means.csv", index_col=0)
         frames.append(frame)
     metrics = ['tox_outcome', 'eff_outcome', 'utility', 'safety_violations', 'dose_error', 'final_dose_error']
+    for metric in metrics:
+        metric_frame = pd.DataFrame(index=frames[0].index)
+        for scenario in range(1, num_scenarios+1):
+            metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
+        metric_frame.to_csv(f"{filepath}/{metric}.csv")
+
+def combine_files_continuous(filepath):
+    filepath = f"results/{filepath}"
+    num_scenarios = 4
+    frames = []
+    for scenario in range(1, num_scenarios+1):
+        frame = pd.read_csv(f"{filepath}/scenario{scenario}/final_metric_means.csv", index_col=0)
+        frames.append(frame)
+    metrics = ['tox_outcome', 'eff_outcome', 'utility', 'safety_violations', 'dose_error',
+               'final_dose_error', 'final_dose_diff', 'final_dose_diff_abs']
     for metric in metrics:
         metric_frame = pd.DataFrame(index=frames[0].index)
         for scenario in range(1, num_scenarios+1):
@@ -112,22 +128,29 @@ def combine_files_ratios(filepath):
 def combine_files_crm(filepath):
     filepath = f"results/{filepath}"
     num_scenarios = 18
+    patient_ratios = np.arange(0.1, 1.0, 0.05)
     frames = []
-    for scenario in range(1, num_scenarios+1):
-        frame = pd.read_csv(f"{filepath}/scenario{scenario}/overall_metrics.csv", index_col=0)
+    # for scenario in range(1, num_scenarios+1):
+    #     frame = pd.read_csv(f"{filepath}/scenario{scenario}/overall_metrics.csv", index_col=0)
+    #     frames.append(frame)
+    for num_samples in patient_ratios:
+        frame = pd.read_csv(f"{filepath}/ratio{round(num_samples, 2)}/overall_metrics.csv", index_col=0)
         frames.append(frame)
     metrics = ['tox_outcome', 'eff_outcome', 'utilities', 'safety_violations', 'dose_error', 'final_dose_error']
     for metric in metrics:
         metric_frame = pd.DataFrame(index=frames[0].index)
-        for scenario in range(1, num_scenarios+1):
-            metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
+        # for scenario in range(1, num_scenarios+1):
+        #     metric_frame[f"scenario{scenario}"] = frames[scenario-1][metric].values
+        for idx, patient_ratio in enumerate(patient_ratios):
+            metric_frame[round(patient_ratio, 2)] = frames[idx][metric].values
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
 
 patient_ratios = np.arange(0.1, 1.0, 0.05)
 
-copy_files('gp_continuous_scenarios', 100, 2)
+#copy_files('crm_ratios2', 100, 2)
 #combine_files('gp_scenarios2')
-# combine_files_ratios('gp_ratios_exp')
+#combine_files_ratios('crm_ratios2')
 #combine_files_sample_sizes('gp_sample_size')
-#combine_files_crm('crm_scenarios3')
+combine_files_crm('crm_ratios2')
+# combine_files_continuous('gp_continuous_scenarios')

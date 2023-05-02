@@ -51,7 +51,7 @@ all_dose_recs = pd.concat(final_dose_recs_list)
 all_dose_recs_grouped = all_dose_recs.groupby('subgroup_idx')['final_dose_rec'].value_counts()
 all_dose_recs_grouped.to_csv(f"{filepath}/final_dose_recs.csv")
 
-plot_gp_trials(tox_means, eff_means, util_vals, x_test,
-                dose_scenario.dose_labels, dose_scenario.toxicity_probs,
-                dose_scenario.efficacy_probs,
-                patient_scenario.num_subgroups, markevery, filepath)
+# plot_gp_trials(tox_means, eff_means, util_vals, x_test,
+#                 dose_scenario.dose_labels, dose_scenario.toxicity_probs,
+#                 dose_scenario.efficacy_probs,
+#                 patient_scenario.num_subgroups, markevery, filepath)

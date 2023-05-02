@@ -37,20 +37,20 @@ def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, out
     # fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 17.5), ylim=(-0.1, 1.0))
 
     fig.set(xlabel=None, ylabel=None, xlim=(-0.1, 1.1), ylim=(-0.5, 17.5))
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
     # plt.legend([],[], frameon=False)
-    # plt.tick_params(
-    #     axis='both',         # changes apply to the x-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     bottom=False,      # ticks along the bottom edge are off
-    #     top=False,         # ticks along the top edge are off
-    #     labelbottom=False, # labels along the bottom edge are off
-    #     left=False,
-    #     labelleft=False
-    # )
-    # plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=500)
+    plt.tick_params(
+        axis='both',         # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=False, # labels along the bottom edge are off
+        left=False,
+        labelleft=False
+    )
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=500)
 
 
 def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_filename):
@@ -88,20 +88,20 @@ def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_fil
     # fig = sns.pointplot(data=frame, x='scenario', y='safety_violations', hue='method', join=False)
     # fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 17.5), ylim=(-0.1, 1.0))
 
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
-    # plt.legend([],[], frameon=False)
-    # plt.tick_params(
-    #     axis='both',         # changes apply to the x-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     bottom=False,      # ticks along the bottom edge are off
-    #     top=False,         # ticks along the top edge are off
-    #     labelbottom=False, # labels along the bottom edge are off
-    #     left=False,
-    #     labelleft=False
-    # )
-    # plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
+    plt.legend([],[], frameon=False)
+    plt.tick_params(
+        axis='both',         # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=False, # labels along the bottom edge are off
+        left=False,
+        labelleft=False
+    )
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
 
 
 def tox_plot(c3t_folder_name, gp_filename, folder_name):
@@ -174,20 +174,20 @@ def utility_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_fi
     fig = sns.pointplot(data=frame, x='utility', y='scenario', hue='method', capsize=0.4, errwidth=2.0, scale=0.9, join=False)
     fig.set(xlabel=None, ylabel=None, xlim=(-1, 1), ylim=(-0.5, 17.5))
 
-    plt.legend()
-    plt.show()
+    # plt.legend()
+    # plt.show()
 
-    # plt.legend([],[], frameon=False)
-    # plt.tick_params(
-    #     axis='both',         # changes apply to the x-axis
-    #     which='both',      # both major and minor ticks are affected
-    #     bottom=False,      # ticks along the bottom edge are off
-    #     top=False,         # ticks along the top edge are off
-    #     labelbottom=False, # labels along the bottom edge are off
-    #     left=False,
-    #     labelleft=False
-    # )
-    # plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
+    plt.legend([],[], frameon=False)
+    plt.tick_params(
+        axis='both',         # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=False, # labels along the bottom edge are off
+        left=False,
+        labelleft=False
+    )
+    plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=300)
 
 
 def tox_eff_plot(c3t_folder_name, gp_tox_filename, gp_eff_filename, folder_name):
@@ -301,7 +301,7 @@ def sample_size_plot(three_filename, c3t_filename, gp_filename, value_name):
     sns.lineplot(data=frame, x='sample_size', y=value_name, style='index', hue='method')
     plt.show()
 
-def ratios_plot(three_filename, c3t_filename, gp_filename, value_name):
+def ratios_plot(out_filename, three_filename, crm_filename, c3t_filename, gp_filename, value_name):
     test_ratios = np.arange(0.15, 0.9, 0.05)
     test_ratios = np.array([round(ratio, 2) for ratio in test_ratios]).astype(str)
     sns.set()
@@ -314,6 +314,15 @@ def ratios_plot(three_filename, c3t_filename, gp_filename, value_name):
     three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name=value_name)
     three_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
     three_melt['method'] = '3+3'
+
+    crm_frame = pd.read_csv(crm_filename, index_col=0)
+    crm_frame.columns = crm_frame.columns
+    crm_frame = crm_frame[test_ratios]
+    crm_frame.columns = test_ratios
+
+    crm_melt = pd.melt(crm_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name=value_name)
+    crm_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    crm_melt['method'] = 'crm'
 
     c3t_frame = pd.read_csv(c3t_filename, index_col=0)
     c3t_frame.columns = c3t_frame.columns
@@ -333,12 +342,31 @@ def ratios_plot(three_filename, c3t_filename, gp_filename, value_name):
     gp_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
     gp_melt['method'] = 'gp'
 
-    frame = pd.concat([three_melt, c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt])
     frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
     frame = frame.reset_index()
     sns.lineplot(data=frame, x='subgroup_ratio', y=value_name, style='index', hue='method')
-    plt.show()
+    plt.savefig(out_filename, dpi=300)
+    plt.close()
 
+def continuous_error_plot(gp_filename):
+    gp_frame = pd.read_csv(gp_filename, index_col=0)
+    frame = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='final_dose_diff_abs')
+
+    # sns.set()
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(5, 4))
+    frame = frame[frame['index'] != 'overall']
+    frame['index'] = frame['index'].apply(lambda val: int(float(val)))
+    frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
+
+    fig = sns.pointplot(data=frame, x='final_dose_diff_abs', y='scenario', capsize=0.4, errwidth=2.0, scale=0.9, join=False)
+    # fig = sns.scatterplot(data=frame, x='scenario', y='dose_error', hue='method', style='index')
+    # fig.set(xlabel=None, ylabel=None, xlim=(-0.5, 17.5), ylim=(-0.1, 1.0))
+
+    fig.set(xlabel=None, ylabel=None, xlim=(-0.1, 40.), ylim=(-0.5, 3.5))
+    plt.legend()
+    plt.show()
 
 
 folder_name = "gp_scenarios2"
@@ -355,15 +383,15 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 # dose_error_plot(f"results/threeplusexp/final_ose_error.csv",
 #                 f"results/{c3t_folder_name}/final dose error.csv",
 #                 "results/crm_scenarios3/final_dose_error.csv",
-#                 dose_filename, f"results/{folder_name}/dose_comparison_9.png")
+#                 dose_filename, f"results/{folder_name}/all_dose_plot.png")
 # safety_plot(f"results/threeplusexp/safety.csv",
 #             f"results/{c3t_folder_name}/safety violations.csv",
 #             "results/crm_scenarios3/safety_violations.csv",
-#             safety_filename, f"results/{folder_name}/safety_comparison_9.png")
+#             safety_filename, f"results/{folder_name}/all_safety_plot.png")
 # utility_plot(f"results/threeplusexp/utility.csv",
 #              f"results/{c3t_folder_name}/thall_utility.csv",
 #              "results/crm_scenarios3/utilities.csv",
-#              utility_filename, f"results/{folder_name}/utility_comparison_9.png")
+#              utility_filename, f"results/{folder_name}/all_utility_plot.png")
 
 
 
@@ -379,11 +407,20 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 
 
 
-# ratios_plot("results/three_baseline_ratios/final_dose_error.csv", "results/c3t_ratios1000_3/final dose error.csv",
-#             "results/gp_ratios_exp/final_dose_error.csv", 'dose_error')
+ratios_plot("results/comparison_plots/ratio_dose_error.png",
+            "results/three_baseline_ratios/final_dose_error.csv", "results/crm_ratios2/final_dose_error.csv",
+            "results/c3t_ratios1000_3/final dose error.csv",
+            "results/gp_ratios_exp/final_dose_error.csv", 'dose_error')
 
-# ratios_plot("results/three_baseline_ratios/safety.csv", "results/c3t_ratios1000_3/safety violations.csv",
-#             "results/gp_ratios_exp/safety_violations.csv", 'safety_violations')
+ratios_plot("results/comparison_plots/ratio_safety.png",
+            "results/three_baseline_ratios/safety.csv", "results/crm_ratios2/safety_violations.csv",
+            "results/c3t_ratios1000_3/safety violations.csv",
+            "results/gp_ratios_exp/safety_violations.csv", 'safety_violations')
 
-ratios_plot("results/three_baseline_ratios/utility.csv", "results/c3t_ratios1000_3/thall_utility.csv",
+ratios_plot("results/comparison_plots/ratio_utility.png",
+            "results/three_baseline_ratios/utility.csv", "results/crm_ratios2/utilities.csv",
+            "results/c3t_ratios1000_3/thall_utility.csv",
             "results/gp_ratios_exp/thall_utilities.csv", 'utility')
+
+
+# continuous_error_plot("results/gp_continuous_scenarios/final_dose_diff_abs.csv")

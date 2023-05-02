@@ -65,7 +65,7 @@ class CRM:
             new_val = dose_value + np.random.uniform(-0.1, 0.1)
         return new_val
 
-    def run_trial(self, dose_scenario, patients, num_subgroups, out_foldername, add_jitter):
+    def run_trial(self, dose_scenario, patients, num_subgroups, out_foldername, add_jitter, num_posterior_samples=1000):
         if not os.path.exists(out_foldername):
             os.makedirs(out_foldername)
 
@@ -114,7 +114,7 @@ class CRM:
             Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
             # Draw posterior samples
-            trace = pm.sample(5000, chains=1)
+            trace = pm.sample(num_posterior_samples, chains=1)
             alpha_trace = trace.posterior['alpha']
             current_alpha_mean = np.mean(alpha_trace).item()
 
@@ -157,7 +157,7 @@ class CRM:
                 Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
                 # Draw posterior samples
-                trace = pm.sample(5000, chains=1)
+                trace = pm.sample(num_posterior_samples, chains=1)
                 alpha_trace = trace.posterior['alpha']
                 current_alpha_mean = np.mean(alpha_trace).item()
 
@@ -254,7 +254,7 @@ class CRM:
             Y_obs = pm.Bernoulli("Y_obs", p=toxicity_prob, observed=Y)
 
             # Draw posterior samples
-            trace = pm.sample(5000, chains=1)
+            trace = pm.sample(1000, chains=1)
             alpha_trace = trace.posterior['alpha']
             current_alpha_mean = np.mean(alpha_trace).item()
 
@@ -443,7 +443,7 @@ def parse_args():
 
 if __name__ == "__main__":
 
-    # python crm.py --filepath results/crm_exp7 --scenario 1 --num_samples 51 --num_trials 1 --add_jitter
+    # python crm.py --filepath results/crm_exp7 --scenario 1 --num_samples 51 --group_ratio 0.5 --num_trials 1 --add_jitter
     filepath, scenario, num_samples, group_ratio, num_trials, run_one, add_jitter = parse_args()
 
     if run_one:

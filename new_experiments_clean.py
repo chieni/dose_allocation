@@ -133,7 +133,8 @@ class DoseExperimentMetrics:
     def save_metrics(self, filepath):
         self.dose_counts_frame.to_csv(f"{filepath}/dose_counts.csv")
         self.metrics_frame.to_csv(f"{filepath}/timestep_metrics.csv")
-        overall_metrics_frame = self.grouped_metrics_frame[['tox_outcome', 'eff_outcome', 'utility', 'safety_violations', 'dose_error', 'final_dose_error']]
+        overall_metrics_frame = self.grouped_metrics_frame[['tox_outcome', 'eff_outcome', 'utility', 'safety_violations',
+                                                            'dose_error', 'final_dose_error', 'final_dose_diff', 'final_dose_diff_abs']]
         overall_metrics_frame.to_csv(f"{filepath}/overall_metrics.csv")
         
         print(overall_metrics_frame)
