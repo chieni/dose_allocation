@@ -5,7 +5,7 @@ import seaborn as sns
 import numpy as np
 
 
-def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_filename):
+def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, gp_sep_filename, out_filename):
     three_frame = pd.read_csv(three_filename, index_col=0)
     three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
     three_melt['method'] = '3+3'
@@ -22,8 +22,12 @@ def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, out
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
     gp_melt['method'] = 'gp'
 
+    gp_sep_frame = pd.read_csv(gp_sep_filename, index_col=0)
+    gp_sep_melt = pd.melt(gp_sep_frame.reset_index(), id_vars='index', var_name='scenario', value_name='dose_error')
+    gp_sep_melt['method'] = 'gp_sep'
+
     # frame = pd.concat([c3t_melt, gp_melt, three_melt])
-    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt, gp_sep_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -53,7 +57,7 @@ def dose_error_plot(three_filename, c3t_filename, crm_filename, gp_filename, out
     plt.savefig(out_filename, bbox_inches="tight", pad_inches=0, dpi=500)
 
 
-def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_filename):
+def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, gp_sep_filename, out_filename):
     three_frame = pd.read_csv(three_filename, index_col=0)
     three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
     three_melt['method'] = '3+3'
@@ -70,8 +74,12 @@ def safety_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_fil
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
     gp_melt['method'] = 'gp'
 
+    gp_sep_frame = pd.read_csv(gp_sep_filename, index_col=0)
+    gp_sep_melt = pd.melt(gp_sep_frame.reset_index(), id_vars='index', var_name='scenario', value_name='safety_violations')
+    gp_sep_melt['method'] = 'gp_sep'
+
     # frame = pd.concat([c3t_melt, gp_melt, three_melt])
-    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt, gp_sep_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     # sns.set()
@@ -145,7 +153,7 @@ def eff_plot(c3t_folder_name, gp_filename, folder_name):
     sns.pointplot(data=frame, x='scenario', y='efficacy', hue='method', join=False)
     plt.savefig(f"{folder_name}/eff_comparison_plot.png", dpi=300)
 
-def utility_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_filename):
+def utility_plot(three_filename, c3t_filename, crm_filename, gp_filename, gp_sep_filename, out_filename):
     three_frame = pd.read_csv(three_filename, index_col=0)
     three_melt = pd.melt(three_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
     three_melt['method'] = '3+3'
@@ -162,8 +170,12 @@ def utility_plot(three_filename, c3t_filename, crm_filename, gp_filename, out_fi
     gp_melt = pd.melt(gp_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
     gp_melt['method'] = 'gp'
 
+    gp_sep_frame = pd.read_csv(gp_sep_filename, index_col=0)
+    gp_sep_melt = pd.melt(gp_sep_frame.reset_index(), id_vars='index', var_name='scenario', value_name='utility')
+    gp_sep_melt['method'] = 'gp_sep'
+
     # frame = pd.concat([c3t_melt, gp_melt, three_melt])
-    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt])
+    frame = pd.concat([three_melt, crm_melt, c3t_melt, gp_melt, gp_sep_melt])
     frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
 
     sns.set_style("whitegrid")
@@ -369,6 +381,7 @@ def continuous_error_plot(gp_filename):
     plt.show()
 
 
+out_folder_name = "results/comparison_plots/"
 folder_name = "gp_scenarios2"
 dose_filename = f"results/{folder_name}/final_dose_error.csv"
 thall_filename = f"results/{folder_name}/thall_final_dose_error_retrain.csv"
@@ -383,15 +396,21 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 # dose_error_plot(f"results/threeplusexp/final_ose_error.csv",
 #                 f"results/{c3t_folder_name}/final dose error.csv",
 #                 "results/crm_scenarios3/final_dose_error.csv",
-#                 dose_filename, f"results/{folder_name}/all_dose_plot.png")
+#                 dose_filename, 
+#                 f"results/gp_scenarios_separate/final_dose_error.csv",
+#                 f"{out_folder_name}/all_dose_plot.png")
 # safety_plot(f"results/threeplusexp/safety.csv",
 #             f"results/{c3t_folder_name}/safety violations.csv",
 #             "results/crm_scenarios3/safety_violations.csv",
-#             safety_filename, f"results/{folder_name}/all_safety_plot.png")
+#             safety_filename, 
+#             f"results/gp_scenarios_separate/safety_violations.csv",
+#             f"{out_folder_name}/all_safety_plot.png")
 # utility_plot(f"results/threeplusexp/utility.csv",
 #              f"results/{c3t_folder_name}/thall_utility.csv",
 #              "results/crm_scenarios3/utilities.csv",
-#              utility_filename, f"results/{folder_name}/all_utility_plot.png")
+#              utility_filename, 
+#              f"results/gp_scenarios_separate/utility.csv",
+#              f"{out_folder_name}/all_utility_plot.png")
 
 
 
@@ -407,20 +426,20 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 
 
 
-ratios_plot("results/comparison_plots/ratio_dose_error.png",
-            "results/three_baseline_ratios/final_dose_error.csv", "results/crm_ratios2/final_dose_error.csv",
-            "results/c3t_ratios1000_3/final dose error.csv",
-            "results/gp_ratios_exp/final_dose_error.csv", 'dose_error')
+# ratios_plot("results/comparison_plots/ratio_dose_error.png",
+#             "results/three_baseline_ratios/final_dose_error.csv", "results/crm_ratios2/final_dose_error.csv",
+#             "results/c3t_ratios1000_3/final dose error.csv",
+#             "results/gp_ratios_exp/final_dose_error.csv", 'dose_error')
 
-ratios_plot("results/comparison_plots/ratio_safety.png",
-            "results/three_baseline_ratios/safety.csv", "results/crm_ratios2/safety_violations.csv",
-            "results/c3t_ratios1000_3/safety violations.csv",
-            "results/gp_ratios_exp/safety_violations.csv", 'safety_violations')
+# ratios_plot("results/comparison_plots/ratio_safety.png",
+#             "results/three_baseline_ratios/safety.csv", "results/crm_ratios2/safety_violations.csv",
+#             "results/c3t_ratios1000_3/safety violations.csv",
+#             "results/gp_ratios_exp/safety_violations.csv", 'safety_violations')
 
-ratios_plot("results/comparison_plots/ratio_utility.png",
-            "results/three_baseline_ratios/utility.csv", "results/crm_ratios2/utilities.csv",
-            "results/c3t_ratios1000_3/thall_utility.csv",
-            "results/gp_ratios_exp/thall_utilities.csv", 'utility')
+# ratios_plot("results/comparison_plots/ratio_utility.png",
+#             "results/three_baseline_ratios/utility.csv", "results/crm_ratios2/utilities.csv",
+#             "results/c3t_ratios1000_3/thall_utility.csv",
+#             "results/gp_ratios_exp/thall_utilities.csv", 'utility')
 
 
 # continuous_error_plot("results/gp_continuous_scenarios/final_dose_diff_abs.csv")
