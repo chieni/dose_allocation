@@ -155,7 +155,7 @@ def calculate_utility_thall(tox_probs, eff_probs, tox_thre, eff_thre, p_param):
 def get_bernoulli_confidence_region(posterior_latent_dist, likelihood_model, num_samples):
     samples = posterior_latent_dist.sample_n(num_samples)
     likelihood_samples = likelihood_model(samples)
-    lower = torch.quantile(likelihood_samples.mean, 0.025, axis=0)
+    lower = torch.quantile(likelihood_samples.mean, 0.025, axis=0) # 2 standard devs from mean
     upper = torch.quantile(likelihood_samples.mean, 1 - 0.025, axis=0)
     mean = likelihood_samples.mean.mean(axis=0)
     variance = likelihood_samples.mean.var(axis=0)
@@ -177,11 +177,9 @@ def get_model_predictions(runner, num_subgroups, x_test, num_confidence_samples,
                                 latent_lower.cpu().numpy(), latent_upper.cpu().numpy())
     return y_posteriors, y_latents
 
-def select_dose(num_doses, max_dose, tox_mean, tox_upper,
-                tox_lower,
-                eff_mean, eff_variance, x_mask, beta_param,
-                tox_thre, eff_thre, p_param,
-                use_utility=False, use_lcb=False):
+
+def select_dose_confidence_and_increasing(num_doses, max_dose, tox_mean, tox_upper,
+                                          tox_lower, x_mask, beta_param, tox_thre, use_lcb=False):
     ## Select ideal dose for subgroup
     # Available doses are current max dose idx + 1
     available_dose_indices = np.arange(max_dose + 2)
@@ -192,34 +190,89 @@ def select_dose(num_doses, max_dose, tox_mean, tox_upper,
     tox_conf_interval = tox_upper - tox_mean
     tox_ucb = tox_mean + (beta_param * tox_conf_interval)
     tox_lcb = tox_mean - (beta_param * (tox_mean - tox_lower))
+
+    tox_acqui = tox_ucb
+    if use_lcb:
+        #tox_acqui = tox_lcb
+        tox_acqui = tox_mean
+    
+    safe_doses_mask = tox_acqui[x_mask] <= tox_thre
+    gt_threshold = np.where(tox_acqui[x_mask] > tox_thre)[0]
+
+    if gt_threshold.size:
+        first_idx_above_threshold = gt_threshold[0]
+        safe_doses_mask[first_idx_above_threshold:] = False
+    # print(f"Safe doses: {safe_doses_mask}")
+
+    dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
+    
+    # Always include previously included doses
+    previous_doses_mask = np.isin(np.arange(num_doses), np.arange(max_dose + 1))
+    dose_set_mask = np.logical_or(dose_set_mask, previous_doses_mask)
+    # print(f"Dose set: {dose_set_mask}")
+
+    ## Select dose with toxicity at widest confidence interval
+    tox_intervals = tox_upper - tox_lower
+    dose_tox_intervals = tox_intervals[x_mask]
+    dose_tox_intervals[~dose_set_mask] = -np.inf
+    max_tox_interval = dose_tox_intervals.max()
+
+    # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+    if dose_set_mask.sum() == 0:
+        selected_dose = 0
+    else:
+        # Select largest safe dose
+        selected_dose = np.where(dose_set_mask == True)[0][-1]
+        # print(f"Selected dose: {selected_dose}")
+        # If this dose has already been seen, instead select based on widest confidence interval
+        if selected_dose <= max_dose:
+            # print("Selecting based on confidence")
+            selected_dose = np.where(dose_tox_intervals == max_tox_interval)[0][-1]
+
+    return selected_dose, tox_acqui, dose_set_mask
+
+def select_dose(num_doses, max_dose, tox_mean, tox_upper,
+                tox_lower, eff_mean, eff_upper, eff_lower, x_mask, beta_param,
+                tox_thre, eff_thre, p_param,
+                use_utility=False, use_lcb=False):
+    
+    # Available doses are current max dose idx + 1
+    available_dose_indices = np.arange(max_dose + 2)
+    available_doses_mask = np.isin(np.arange(num_doses), available_dose_indices)
+
+    # Find UCB for toxicity posteriors to determine safe set
+    tox_conf_interval = tox_upper - tox_mean
+    tox_ucb = tox_mean + (beta_param * tox_conf_interval)
+    tox_lcb = tox_mean - (beta_param * (tox_mean - tox_lower))
     tox_acqui = tox_ucb
     if use_lcb:
         tox_acqui = tox_lcb
 
-    ## Select optimal dose using EI of efficacy posteriors
-    tradeoff_param = 0.1
-    eff_stdev = np.sqrt(eff_variance)
-    eff_opt = eff_mean.max()
-    improvement = eff_mean - eff_opt - tradeoff_param
-    z_val = improvement / eff_stdev
+    safe_doses_mask = tox_acqui[x_mask] <= tox_thre
+    gt_threshold = np.where(tox_acqui[x_mask] > tox_thre)[0]
 
-    eff_ei = (improvement * scipy.stats.norm.cdf(z_val)) + (eff_stdev * scipy.stats.norm.pdf(z_val))
-    eff_ei[eff_stdev == 0.] = 0.
+    if gt_threshold.size:
+        first_idx_above_threshold = gt_threshold[0]
+        safe_doses_mask[first_idx_above_threshold:] = False
 
-    if not use_utility:
-        dose_eff_ei = eff_ei[x_mask]
-        dose_eff_ei[~available_doses_mask] = -np.inf
-        max_eff_ei = dose_eff_ei.max()
-        selected_dose = np.where(dose_eff_ei == max_eff_ei)[0][-1]
-    else:
-        ## Select optimal dose using utility
-        utilities = calculate_utility_thall(tox_mean[x_mask], eff_mean[x_mask], tox_thre, eff_thre,
-                                            p_param)
-        utilities[~available_doses_mask] = -np.inf
-        max_utility = utilities.max()
-        selected_dose = np.where(utilities == max_utility)[0][-1]
+    dose_set_mask = np.logical_and(available_doses_mask, safe_doses_mask)
 
-    return selected_dose, tox_acqui, eff_ei
+    # Calculate efficacy UCB
+    eff_conf_interval = eff_upper - eff_mean
+    eff_ucb = eff_mean + (beta_param * eff_conf_interval)
+
+    # Use tox UCB (for extra safety) and eff UCB (for some optimism) to calculate utilities
+    utilities = calculate_utility_thall(tox_ucb, eff_ucb,
+                                        tox_thre, eff_thre, p_param)
+    dose_utilities = utilities[x_mask]
+    dose_utilities[~dose_set_mask] = -np.inf
+    max_util = dose_utilities.max()
+    selected_dose = np.where(dose_utilities == max_util)[0][-1]
+
+    # If all doses are unsafe, return first dose. If this happens enough times, stop trial.
+    if dose_set_mask.sum() == 0:
+        selected_dose = 0
+    return selected_dose, tox_acqui, utilities
 
 def select_final_dose(num_subgroups, num_doses, dose_labels, x_test, max_doses,
                       tox_posteriors, eff_posteriors, 
@@ -385,18 +438,30 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
         cohort_patients = patients[timestep: timestep + cohort_size]
 
         for subgroup_idx in range(patient_scenario.num_subgroups):
-            selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
-            eff_acqui_funcs[subgroup_idx, :] = \
-            select_dose(num_doses, max_doses[subgroup_idx],
-                        y_tox_posteriors.mean[subgroup_idx, :],
-                        y_tox_posteriors.upper[subgroup_idx, :],
-                        y_tox_posteriors.lower[subgroup_idx, :],
-                        y_eff_posteriors.mean[subgroup_idx, :],
-                        y_eff_posteriors.variance[subgroup_idx, :], x_mask,
-                        current_beta_param, dose_scenario.toxicity_threshold,
-                        dose_scenario.efficacy_threshold,
-                        dose_scenario.p_param,
-                        use_utility=use_utility, use_lcb=use_lcb_exp)
+            if timestep <= sampling_timesteps:
+                selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :], dose_set_mask[subgroup_idx, :] \
+                 = select_dose_confidence_and_increasing(num_doses, max_doses[subgroup_idx],
+                                                                                         y_tox_posteriors.mean[subgroup_idx, :], 
+                                                                                         y_tox_posteriors.upper[subgroup_idx, :],
+                                                                                         y_tox_posteriors.lower[subgroup_idx, :],
+                                                                                         x_mask, current_beta_param, dose_scenario.toxicity_threshold,
+                                                                                         use_lcb=use_lcb_init)
+                eff_acqui_funcs[subgroup_idx, :] = 0.
+
+            else:
+                selected_dose_by_subgroup[subgroup_idx], tox_acqui_funcs[subgroup_idx, :],\
+                eff_acqui_funcs[subgroup_idx, :] = \
+                select_dose(num_doses, max_doses[subgroup_idx],
+                            y_tox_posteriors.mean[subgroup_idx, :],
+                            y_tox_posteriors.upper[subgroup_idx, :],
+                            y_tox_posteriors.lower[subgroup_idx, :],
+                            y_eff_posteriors.mean[subgroup_idx, :],
+                            y_eff_posteriors.upper[subgroup_idx, :], 
+                            y_eff_posteriors.lower[subgroup_idx, :], x_mask,
+                            current_beta_param, dose_scenario.toxicity_threshold,
+                            dose_scenario.efficacy_threshold,
+                            dose_scenario.p_param,
+                            use_utility=use_utility, use_lcb=use_lcb_exp)
 
 
             util_func[subgroup_idx, :] = calculate_utility_thall(y_tox_posteriors.mean[subgroup_idx, :],
