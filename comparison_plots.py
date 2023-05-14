@@ -304,7 +304,7 @@ def sample_size_plot(three_filename, c3t_filename, gp_filename, value_name):
 def ratios_plot(out_filename, three_filename, crm_filename, c3t_filename, gp_filename, value_name):
     test_ratios = np.arange(0.15, 0.9, 0.05)
     test_ratios = np.array([round(ratio, 2) for ratio in test_ratios]).astype(str)
-    sns.set()
+    sns.set_style("whitegrid")
 
     three_frame = pd.read_csv(three_filename, index_col=0)
     three_frame.columns = three_frame.columns

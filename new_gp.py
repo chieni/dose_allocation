@@ -73,7 +73,8 @@ class MultitaskClassificationRunner:
 
     def train(self, train_x, train_y, task_indices, num_epochs, learning_rate, use_gpu, set_lmc):
         if self.num_latents == 2:
-            lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
+            # lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7]])
+            lmc_coeffs = torch.tensor([[1.0, 0.], [0., 1.0]])
         else:
             lmc_coeffs = torch.tensor([[1.0, 0.], [0.2, 0.2], [0., 1.]])
             # lmc_coeffs = torch.tensor([[0.7, 0.3], [0.3, 0.7], [0.3, 0.7]])

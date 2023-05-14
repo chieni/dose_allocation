@@ -10,7 +10,8 @@ def copy_files(folder_name, num_trials, num_subgroups):
             '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
             '4.236.170.149','4.236.170.103', '172.174.224.64']
     folders = [folder_name for idx in range(len(servers))]
-    patient_ratios = np.arange(0.1, 1.0, 0.05)
+    # patient_ratios = np.arange(0.1, 1.0, 0.05)
+    test_sample_nums = np.arange(60, 240, 9)
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
         # Create an SSH client
@@ -35,7 +36,8 @@ def copy_files(folder_name, num_trials, num_subgroups):
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
             #path = f"results/{folder_name}/scenario{idx+1}"
-            path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            # path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            path = f"results/{folder_name}/num_samples{test_sample_nums[idx]}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
@@ -148,9 +150,9 @@ def combine_files_crm(filepath):
 
 patient_ratios = np.arange(0.1, 1.0, 0.05)
 
-#copy_files('crm_ratios2', 100, 2)
+copy_files('crm_sample_exp', 100, 2)
 #combine_files('gp_scenarios2')
 #combine_files_ratios('crm_ratios2')
 #combine_files_sample_sizes('gp_sample_size')
-combine_files_crm('crm_ratios2')
+# combine_files_crm('crm_ratios2')
 # combine_files_continuous('gp_continuous_scenarios')

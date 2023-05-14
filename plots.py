@@ -14,7 +14,10 @@ def _plot_gp_helper(ax, x_train, y_train, x_true, y_true, x_test, y_test,
     if selected_dose < len(x_true):
         ax.plot(x_true[selected_dose], y_test[x_mask][selected_dose], 'r', marker='o')
     if optimal_dose < len(x_true):
-        ax.plot(x_true[optimal_dose], y_true[x_mask][optimal_dose], 'c', marker='o')
+        y_plot_vals = y_true[optimal_dose]
+        if len(y_true) == len(y_test):
+            y_plot_vals = y_true[x_mask][optimal_dose]
+        ax.plot(x_true[optimal_dose], y_plot_vals, 'c', marker='o')
     ax.fill_between(x_test, y_test_lower, y_test_upper, alpha=0.5)
     if set_axis:
         ax.set_ylim([0, 1.1])
