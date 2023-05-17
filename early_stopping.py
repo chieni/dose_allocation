@@ -409,7 +409,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     dose_set_mask = np.empty((num_subgroups, num_doses), dtype=np.bool)
     num_violations = 0
-    max_num_violations = 8
+    max_num_violations = 6
     while timestep < num_samples:
         print(f"Timestep: {timestep}")
         current_beta_param = np.float32(beta_param)
@@ -532,7 +532,8 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
 
     # Train model final time
     # Construct training data
-    task_indices = torch.LongTensor(patients)
+    final_num_patients = len(selected_dose_values)
+    task_indices = torch.LongTensor(patients[:final_num_patients])
     x_train = torch.tensor(selected_dose_values, dtype=torch.float32)
     y_tox_train = torch.tensor(tox_outcomes, dtype=torch.float32)
     y_eff_train = torch.tensor(eff_outcomes, dtype=torch.float32)
@@ -567,7 +568,7 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                               dose_scenario.p_param,
                                                               final_beta_param)
 
-    experiment_metrics = DoseExperimentMetrics(dose_scenario, patients, selected_doses,
+    experiment_metrics = DoseExperimentMetrics(dose_scenario, patients[:final_num_patients], selected_doses,
                                                tox_outcomes, eff_outcomes, y_tox_posteriors.mean[:, x_mask],
                                                y_tox_posteriors.upper[:, x_mask], y_eff_posteriors.mean[:, x_mask],
                                                final_selected_doses, final_utilities)
@@ -582,10 +583,10 @@ def online_dose_finding(filepath, dose_scenario, patient_scenario,
                                                     dose_scenario.efficacy_threshold,
                                                     dose_scenario.p_param)
  
-    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
+    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:final_num_patients], num_subgroups,
             np_x_test, y_tox_posteriors, y_eff_posteriors, util_func, final_selected_doses,
             markevery, x_mask, f"{filepath}/final_gp_plot", dose_scenario.optimal_doses)
-    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients, num_subgroups,
+    plot_gp(dose_scenario, x_train, y_tox_train, y_eff_train, patients[:final_num_patients], num_subgroups,
             np_x_test, y_tox_latents, y_eff_latents, util_func, final_selected_doses,
             markevery, x_mask, f"{filepath}/final_gp_latents_plot", dose_scenario.optimal_doses)
     

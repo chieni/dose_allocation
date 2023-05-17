@@ -123,6 +123,15 @@ def get_one_model_command(exp_name, scenario_num, num_samples, sampling_timestep
 
     return command
 
+def get_early_stop_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio, num_trials):
+    command = f"python early_stopping.py --filepath results/{exp_name} \
+               --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
+               --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
+               --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
+               --set_lmc --use_thall --use_lcb_init --group_ratio {group_ratio} --num_trials {num_trials}" 
+
+    return command
+
 def get_continuous_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio, num_trials):
     command = f"python continuous_experiments.py --filepath results/{exp_name} \
                --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
@@ -151,15 +160,15 @@ servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.18
 # launch_experiment('172.174.178.62', 'exp24', 9, 51, 18)
 
 # For all scenarios
-# num_samples = 51
-# num_trials = 100
-# sampling_timesteps = 18
-# patient_ratio = 0.5
-# for idx in range(18):
-#     server = servers[idx]
-#     scenario_idx =  idx + 1
-#     exp_command = get_one_model_command('gp_scenarios_one_model', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
-#     launch_experiment(server, exp_command)
+num_samples = 51
+num_trials = 100
+sampling_timesteps = 18
+patient_ratio = 0.5
+for idx in range(18):
+    server = servers2[idx]
+    scenario_idx =  idx + 1
+    exp_command = get_early_stop_command('gp_scenarios_early_stop', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
+    launch_experiment(server, exp_command)
 
 
 # For all scenarios
@@ -200,18 +209,18 @@ servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.18
 #     scenario_idx = scenarios_to_try[idx % len(scenarios_to_try)]
 #     launch_crm_experiment(server, 'crm_scenarios5', scenario_idx, num_samples, num_trials)
 
-patient_ratios = np.arange(0.1, 1.0, 0.05)
-scenario_idx = 11
-# num_samples = 201
-# sampling_timesteps = 69
-num_samples = 99
-sampling_timesteps = 33
-num_trials = 100
+# patient_ratios = np.arange(0.1, 1.0, 0.05)
+# scenario_idx = 11
+# # num_samples = 201
+# # sampling_timesteps = 69
+# num_samples = 99
+# sampling_timesteps = 33
+# num_trials = 100
 
-for idx, patient_ratio in enumerate(patient_ratios):
-    server = servers[idx]
-    exp_command = get_separate_command('gp_ratios_small_separate', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
-    launch_experiment(server, exp_command)
+# for idx, patient_ratio in enumerate(patient_ratios):
+#     server = servers[idx]
+#     exp_command = get_separate_command('gp_ratios_small_separate', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
+#     launch_experiment(server, exp_command)
 
 
 # patient_ratios = np.arange(0.1, 1.0, 0.05)

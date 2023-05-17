@@ -32,8 +32,8 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            #path = f"results/{folder_name}/scenario{idx+1}"
-            path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            path = f"results/{folder_name}/scenario{idx+1}"
+            #path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
             #path = f"results/{folder_name}/num_samples{test_sample_nums[idx]}"
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -154,9 +154,9 @@ servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.18
             '172.174.212.157', '172.174.212.161', '172.174.212.136', '172.174.212.171', '172.174.212.174',
             '172.174.212.176', '172.174.212.183', '172.174.212.248']
 
-# copy_files(servers2, 'gp_ratios_small', 100, 2)
-# combine_files('gp_ratios_small')
-combine_files_ratios('gp_ratios_small')
+copy_files(servers2, 'gp_scenarios_early_stop', 100, 2)
+combine_files('gp_scenarios_early_stop')
+# combine_files_ratios('gp_ratios_small')
 #combine_files_sample_sizes('gp_sample_size')
 # combine_files_crm('crm_ratios2')
 # combine_files_continuous('gp_continuous_scenarios')
