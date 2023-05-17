@@ -382,7 +382,7 @@ def continuous_error_plot(gp_filename):
 
 
 out_folder_name = "results/comparison_plots/"
-folder_name = "gp_scenarios2"
+folder_name = "gp_scenarios3"
 dose_filename = f"results/{folder_name}/final_dose_error.csv"
 thall_filename = f"results/{folder_name}/thall_final_dose_error_retrain.csv"
 safety_filename = f"results/{folder_name}/safety_violations.csv"
@@ -391,26 +391,30 @@ eff_filename = f"results/{folder_name}/eff_outcome.csv"
 utility_filename = f"results/{folder_name}/utility.csv"
 
 c3t_folder_name = "c3t_scenarios_jitter8"
-
+#gp_comparison_folder = "gp_scenarios_util"
+#gp_comparison_folder = "gp_scenarios_separate"
+# gp_comparison_folder = "gp_scenarios_unconstrained"
+gp_comparison_folder = "gp_scenarios_one_model"
+suffix = "one_model"
 
 # dose_error_plot(f"results/threeplusexp/final_ose_error.csv",
 #                 f"results/{c3t_folder_name}/final dose error.csv",
 #                 "results/crm_scenarios3/final_dose_error.csv",
 #                 dose_filename, 
-#                 f"results/gp_scenarios_separate/final_dose_error.csv",
-#                 f"{out_folder_name}/all_dose_plot.png")
+#                 f"results/{gp_comparison_folder}/final_dose_error.csv",
+#                 f"{out_folder_name}/all_dose_plot_{suffix}.png")
 # safety_plot(f"results/threeplusexp/safety.csv",
 #             f"results/{c3t_folder_name}/safety violations.csv",
 #             "results/crm_scenarios3/safety_violations.csv",
 #             safety_filename, 
-#             f"results/gp_scenarios_separate/safety_violations.csv",
-#             f"{out_folder_name}/all_safety_plot.png")
+#             f"results/{gp_comparison_folder}/safety_violations.csv",
+#             f"{out_folder_name}/all_safety_plot_{suffix}.png")
 # utility_plot(f"results/threeplusexp/utility.csv",
 #              f"results/{c3t_folder_name}/thall_utility.csv",
 #              "results/crm_scenarios3/utilities.csv",
 #              utility_filename, 
-#              f"results/gp_scenarios_separate/utility.csv",
-#              f"{out_folder_name}/all_utility_plot.png")
+#              f"results/{gp_comparison_folder}/utility.csv",
+#              f"{out_folder_name}/all_utility_plot_{suffix}.png")
 
 
 
@@ -425,21 +429,24 @@ c3t_folder_name = "c3t_scenarios_jitter8"
 #                  "results/gp_sample_size/safety_violations.csv", 'safety violatations')
 
 
+# gp_ratios_folder = "gp_ratios_exp"
+gp_ratios_folder = "gp_ratios_small"
+suffix = "small"
 
-# ratios_plot("results/comparison_plots/ratio_dose_error.png",
-#             "results/three_baseline_ratios/final_dose_error.csv", "results/crm_ratios2/final_dose_error.csv",
-#             "results/c3t_ratios1000_3/final dose error.csv",
-#             "results/gp_ratios_exp/final_dose_error.csv", 'dose_error')
+ratios_plot(f"results/comparison_plots/ratio_dose_error_{suffix}.png",
+            "results/three_baseline_ratios/final_dose_error.csv", "results/crm_ratios2/final_dose_error.csv",
+            "results/c3t_ratios1000_3/final dose error.csv",
+            f"results/{gp_ratios_folder}/final_dose_error.csv", 'dose_error')
 
-# ratios_plot("results/comparison_plots/ratio_safety.png",
-#             "results/three_baseline_ratios/safety.csv", "results/crm_ratios2/safety_violations.csv",
-#             "results/c3t_ratios1000_3/safety violations.csv",
-#             "results/gp_ratios_exp/safety_violations.csv", 'safety_violations')
+ratios_plot(f"results/comparison_plots/ratio_safety_{suffix}.png",
+            "results/three_baseline_ratios/safety.csv", "results/crm_ratios2/safety_violations.csv",
+            "results/c3t_ratios1000_3/safety violations.csv",
+            f"results/{gp_ratios_folder}/safety_violations.csv", 'safety_violations')
 
-# ratios_plot("results/comparison_plots/ratio_utility.png",
-#             "results/three_baseline_ratios/utility.csv", "results/crm_ratios2/utilities.csv",
-#             "results/c3t_ratios1000_3/thall_utility.csv",
-#             "results/gp_ratios_exp/thall_utilities.csv", 'utility')
+ratios_plot(f"results/comparison_plots/ratio_utility_{suffix}.png",
+            "results/three_baseline_ratios/utility.csv", "results/crm_ratios2/utilities.csv",
+            "results/c3t_ratios1000_3/thall_utility.csv",
+            f"results/{gp_ratios_folder}/utility.csv", 'utility')
 
 
 # continuous_error_plot("results/gp_continuous_scenarios/final_dose_diff_abs.csv")

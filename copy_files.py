@@ -4,12 +4,9 @@ import pandas as pd
 import numpy as np
 
 
-def copy_files(folder_name, num_trials, num_subgroups):
-    servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','172.174.234.5',
-            '172.174.234.65','172.174.234.185', '172.174.234.240', '172.174.233.180','172.174.235.241',
-            '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
-            '4.236.170.149','4.236.170.103', '172.174.224.64']
+def copy_files(servers, folder_name, num_trials, num_subgroups):
     folders = [folder_name for idx in range(len(servers))]
+
     patient_ratios = np.arange(0.1, 1.0, 0.05)
     test_sample_nums = np.arange(60, 240, 9)
 
@@ -35,8 +32,8 @@ def copy_files(folder_name, num_trials, num_subgroups):
         # Download the matching files
         for file in matching_files:
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
-            path = f"results/{folder_name}/scenario{idx+1}"
-            # path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
+            #path = f"results/{folder_name}/scenario{idx+1}"
+            path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
             #path = f"results/{folder_name}/num_samples{test_sample_nums[idx]}"
             if not os.path.exists(path):
                 os.makedirs(path)
@@ -148,11 +145,18 @@ def combine_files_crm(filepath):
         metric_frame.to_csv(f"{filepath}/{metric}.csv")
 
 
-patient_ratios = np.arange(0.1, 1.0, 0.05)
+servers = ['172.174.178.62', '20.55.111.55','20.55.111.101','172.174.233.187','172.174.234.5',
+        '172.174.234.65','172.174.234.185', '172.174.234.240', '172.174.233.180','172.174.235.241',
+        '172.174.234.17', '172.174.234.16','172.174.233.34','172.174.233.135','4.236.170.64','20.55.26.95',
+        '4.236.170.149','4.236.170.103', '172.174.224.64']
+servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.184', '20.119.91.21',
+            '172.174.208.22', '172.174.212.95', '172.174.212.107', '172.174.212.108', '172.174.212.139',
+            '172.174.212.157', '172.174.212.161', '172.174.212.136', '172.174.212.171', '172.174.212.174',
+            '172.174.212.176', '172.174.212.183', '172.174.212.248']
 
-# copy_files('gp_scenarios_separate', 100, 2)
-combine_files('gp_scenarios_separate')
-#combine_files_ratios('crm_ratios2')
+# copy_files(servers2, 'gp_ratios_small', 100, 2)
+# combine_files('gp_ratios_small')
+combine_files_ratios('gp_ratios_small')
 #combine_files_sample_sizes('gp_sample_size')
 # combine_files_crm('crm_ratios2')
 # combine_files_continuous('gp_continuous_scenarios')
