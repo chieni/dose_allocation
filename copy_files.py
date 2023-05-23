@@ -12,6 +12,8 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
         # Create an SSH client
+        if idx != 15:
+            continue
         client = paramiko.SSHClient()
 
         # Automatically add the server's host key (this is insecure, you should use ssh-keys instead)
@@ -34,7 +36,7 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
             remote_file = f"dose_allocation/results/{folder_name}/{file}"
             path = f"results/{folder_name}/scenario{idx+1}"
             #path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}"
-            #path = f"results/{folder_name}/num_samples{test_sample_nums[idx]}"
+            ##path = f"results/{folder_name}/num_samples{test_sample_nums[idx]}"
             if not os.path.exists(path):
                 os.makedirs(path)
             local_file = f"{path}/{file}"
@@ -44,25 +46,25 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
                 continue
         
        # Download trial files
-        # for trial in range(num_trials):
-        #     local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
-        #     #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
-        #     if not os.path.exists(local_path):
-        #         os.makedirs(local_path)
-        #     remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
-        #     for subgroup_idx in range(num_subgroups):
-        #         remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
-        #         local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
-        #         try:
-        #             sftp.get(remote_file, local_file)
-        #         except:
-        #             continue
-        #     remote_file = f"{remote_path}/timestep_metrics.csv"
-        #     local_file = f"{local_path}/timestep_metrics.csv"
-        #     try:
-        #         sftp.get(remote_file, local_file)
-        #     except:
-        #         continue
+        for trial in range(num_trials):
+            local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
+            #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
+            if not os.path.exists(local_path):
+                os.makedirs(local_path)
+            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+            for subgroup_idx in range(num_subgroups):
+                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+                try:
+                    sftp.get(remote_file, local_file)
+                except:
+                    continue
+            remote_file = f"{remote_path}/timestep_metrics.csv"
+            local_file = f"{local_path}/timestep_metrics.csv"
+            try:
+                sftp.get(remote_file, local_file)
+            except:
+                continue
 
         sftp.close()
         client.close()
@@ -112,7 +114,7 @@ def combine_files_sample_sizes(filepath):
 
 def combine_files_ratios(filepath):
     filepath = f"results/{filepath}"
-    patient_ratios = np.arange(0.1, 1.0, 0.05)
+    patient_ratios = np.arange(0.1, 0.95, 0.05)
     frames = []
     for num_samples in patient_ratios:
         frame = pd.read_csv(f"{filepath}/ratio{round(num_samples, 2)}/final_metric_means.csv", index_col=0)
@@ -127,7 +129,7 @@ def combine_files_ratios(filepath):
 def combine_files_crm(filepath):
     filepath = f"results/{filepath}"
     num_scenarios = 18
-    patient_ratios = np.arange(0.1, 1.0, 0.05)
+    patient_ratios = np.arange(0.1, 0.9, 0.05)
     frames = []
     # for scenario in range(1, num_scenarios+1):
     #     frame = pd.read_csv(f"{filepath}/scenario{scenario}/overall_metrics.csv", index_col=0)
@@ -155,8 +157,8 @@ servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.18
             '172.174.212.176', '172.174.212.183', '172.174.212.248']
 
 copy_files(servers2, 'gp_scenarios_early_stop', 100, 2)
-combine_files('gp_scenarios_early_stop')
-# combine_files_ratios('gp_ratios_small')
+#combine_files('gp_scenarios4')
+#combine_files_ratios('gp_ratios_small_separate')
 #combine_files_sample_sizes('gp_sample_size')
 # combine_files_crm('crm_ratios2')
 # combine_files_continuous('gp_continuous_scenarios')

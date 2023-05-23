@@ -14,7 +14,7 @@ import seaborn as sns
 class DoseFindingScenario:
     def __init__(self, dose_labels, toxicity_probs, efficacy_probs, optimal_doses,
                  toxicity_threshold, efficacy_threshold, tox_models=None, eff_models=None,
-                 dose_range=None, p_param=None, tox_weight=None, eff_weight=None):
+                 dose_range=None, p_param=None, tox_weight=None, eff_weight=None, midpoint=None):
         self.num_doses = len(dose_labels)
         if len(toxicity_probs.shape) > 1:
             self.num_subgroups = toxicity_probs.shape[0]
@@ -34,6 +34,7 @@ class DoseFindingScenario:
         self.eff_weight = eff_weight
         self.tox_weight = 1.
         self.eff_weight = self.toxicity_threshold / self.efficacy_threshold
+        self.midpoint = midpoint
 
     @staticmethod
     def calculate_utility_param(tox_threshold, eff_threshold, midpoint):
@@ -102,7 +103,7 @@ class DoseFindingScenario:
         plt.tight_layout()
         plt.legend()
         plt.show()
-    
+
     def plot_paper_subgroup_curves(self, scenario_idx):
         sns.set_style("whitegrid")
         plt.figure(figsize=(4, 4))
@@ -256,7 +257,7 @@ class DoseFindingScenarios:
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
-                                   dose_range=dose_range, p_param=p_param)
+                                   dose_range=dose_range, p_param=p_param, midpoint=midpoint)
 
     @staticmethod
     def continuous_subgroups_example_2():
@@ -291,7 +292,7 @@ class DoseFindingScenarios:
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
-                                   dose_range=dose_range, p_param=p_param)
+                                   dose_range=dose_range, p_param=p_param, midpoint=midpoint)
 
     @staticmethod
     def continuous_subgroups_example_3():
@@ -325,7 +326,7 @@ class DoseFindingScenarios:
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model],
-                                   dose_range=dose_range, p_param=p_param)
+                                   dose_range=dose_range, p_param=p_param, midpoint=midpoint)
     
     @staticmethod
     def continuous_subgroups_example_4():
@@ -358,7 +359,7 @@ class DoseFindingScenarios:
         return DoseFindingScenario(dose_labels, toxicity_probs, efficacy_probs,
                                    optimal_doses, toxicity_threshold=tox_thre, efficacy_threshold=eff_thre,
                                    tox_models=[tox_model, tox_model2], eff_models=[eff_model, eff_model2],
-                                   dose_range=dose_range, p_param=p_param)
+                                   dose_range=dose_range, p_param=p_param, midpoint=midpoint)
     
     @staticmethod
     def subgroups_example_1():
@@ -1362,29 +1363,3 @@ class TrialPopulationScenarios:
 
 
 
-scenarios = {
-    1: DoseFindingScenarios.paper_example_1(),
-    2: DoseFindingScenarios.paper_example_2(),
-    3: DoseFindingScenarios.paper_example_3(),
-    4: DoseFindingScenarios.paper_example_4(),
-    5: DoseFindingScenarios.paper_example_5(),
-    6: DoseFindingScenarios.paper_example_6(),
-    7: DoseFindingScenarios.paper_example_7(),
-    8: DoseFindingScenarios.paper_example_8(),
-    9: DoseFindingScenarios.paper_example_9(),
-    10: DoseFindingScenarios.paper_example_10(),
-    11: DoseFindingScenarios.paper_example_11(),
-    12: DoseFindingScenarios.paper_example_12(),
-    13: DoseFindingScenarios.paper_example_13(),
-    14: DoseFindingScenarios.paper_example_14(),
-    15: DoseFindingScenarios.paper_example_15(),
-    16: DoseFindingScenarios.paper_example_16(),
-    17: DoseFindingScenarios.paper_example_17(),
-    18: DoseFindingScenarios.paper_example_18(),
-    19: DoseFindingScenarios.paper_example_19()
-}
-
-
-
-# scenario = DoseFindingScenarios.continuous_subgroups_example_2()
-# scenario.plot_true_subgroup_curves(marker_val='')

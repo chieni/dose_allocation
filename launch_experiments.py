@@ -2,6 +2,7 @@ import numpy as np
 import paramiko
 
 
+password = ""
 def launch_experiment(hostname, exp_command):
     # Create an SSH client
     ssh = paramiko.SSHClient()
@@ -10,7 +11,7 @@ def launch_experiment(hostname, exp_command):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # Connect to the remote server
-    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
+    ssh.connect(hostname=hostname, username='ic390', password=password)
 
     # Run a command 
     print(exp_command)
@@ -32,7 +33,7 @@ def kill_experiment(hostname):
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # Connect to the remote server
-    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
+    ssh.connect(hostname=hostname, username='ic390', password=password)
 
     stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'pkill python' ")
     count = 0
@@ -47,7 +48,7 @@ def kill_experiment(hostname):
 def launch_crm_experiment(hostname, exp_name, scenario_num, num_samples, group_ratio, num_trials):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname=hostname, username='ic390', password='B!scuit3310!')
+    ssh.connect(hostname=hostname, username='ic390', password=password)
     crm_command = get_crm_command(exp_name, scenario_num, num_samples, group_ratio, num_trials)
     print(crm_command)
     stdin, stdout, stderr = ssh.exec_command(f"/bin/bash -lc 'conda activate azureml_py38 \n cd dose_allocation \n git stash \n git pull \n nohup {crm_command} >/dev/null 2>&1' ")
@@ -132,6 +133,16 @@ def get_early_stop_command(exp_name, scenario_num, num_samples, sampling_timeste
 
     return command
 
+def get_mtd_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio, num_trials):
+    command = f"python gp_mtd.py --filepath results/{exp_name} \
+               --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
+               --tox_lengthscale 4 --eff_lengthscale 2  --tox_mean -0.3 \
+               --eff_mean -0.1 --learning_rate 0.0075 --num_latents 3 \
+               --set_lmc --use_thall --use_lcb_init --group_ratio {group_ratio} --num_trials {num_trials}" 
+
+    return command
+
+
 def get_continuous_command(exp_name, scenario_num, num_samples, sampling_timesteps, group_ratio, num_trials):
     command = f"python continuous_experiments.py --filepath results/{exp_name} \
                --scenario {scenario_num} --beta_param 0.2 --num_samples {num_samples} --sampling_timesteps {sampling_timesteps} \
@@ -165,9 +176,9 @@ num_trials = 100
 sampling_timesteps = 18
 patient_ratio = 0.5
 for idx in range(18):
-    server = servers2[idx]
+    server = servers[idx]
     scenario_idx =  idx + 1
-    exp_command = get_early_stop_command('gp_scenarios_early_stop', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
+    exp_command = get_mtd_command('gp_scenarios_mtd', scenario_idx, num_samples, sampling_timesteps, patient_ratio, num_trials)
     launch_experiment(server, exp_command)
 
 
