@@ -2,7 +2,7 @@ import numpy as np
 import paramiko
 
 
-password = ""
+password = ''
 def launch_experiment(hostname, exp_command):
     # Create an SSH client
     ssh = paramiko.SSHClient()

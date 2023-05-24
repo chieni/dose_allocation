@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 
 
+password = ''
 def copy_files(servers, folder_name, num_trials, num_subgroups):
     folders = [folder_name for idx in range(len(servers))]
 
@@ -12,15 +13,13 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
 
     for idx, (server_name, folder_name) in enumerate(zip(servers, folders)):
         # Create an SSH client
-        if idx != 15:
-            continue
         client = paramiko.SSHClient()
 
         # Automatically add the server's host key (this is insecure, you should use ssh-keys instead)
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         # Connect to the server
-        client.connect(hostname=server_name, username='ic390', password='B!scuit3310!')
+        client.connect(hostname=server_name, username='ic390', password=password)
 
         # Create an SFTP client
         sftp = client.open_sftp()
@@ -46,25 +45,25 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
                 continue
         
        # Download trial files
-        for trial in range(num_trials):
-            local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
-            #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
-            if not os.path.exists(local_path):
-                os.makedirs(local_path)
-            remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
-            for subgroup_idx in range(num_subgroups):
-                remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
-                local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
-                try:
-                    sftp.get(remote_file, local_file)
-                except:
-                    continue
-            remote_file = f"{remote_path}/timestep_metrics.csv"
-            local_file = f"{local_path}/timestep_metrics.csv"
-            try:
-                sftp.get(remote_file, local_file)
-            except:
-                continue
+        # for trial in range(num_trials):
+        #     local_path = f"results/{folder_name}/scenario{idx+1}/trial{trial}"
+        #     #local_path = f"results/{folder_name}/ratio{round(patient_ratios[idx], 2)}/trial{trial}"
+        #     if not os.path.exists(local_path):
+        #         os.makedirs(local_path)
+        #     remote_path = f"dose_allocation/results/{folder_name}/trial{trial}"
+        #     for subgroup_idx in range(num_subgroups):
+        #         remote_file = f"{remote_path}/{subgroup_idx}_predictions.csv"
+        #         local_file = f"{local_path}/{subgroup_idx}_predictions.csv"
+        #         try:
+        #             sftp.get(remote_file, local_file)
+        #         except:
+        #             continue
+        #     remote_file = f"{remote_path}/timestep_metrics.csv"
+        #     local_file = f"{local_path}/timestep_metrics.csv"
+        #     try:
+        #         sftp.get(remote_file, local_file)
+        #     except:
+        #         continue
 
         sftp.close()
         client.close()
@@ -156,8 +155,8 @@ servers2 = ['172.174.224.64', '20.42.87.118', '172.174.180.168', '172.174.180.18
             '172.174.212.157', '172.174.212.161', '172.174.212.136', '172.174.212.171', '172.174.212.174',
             '172.174.212.176', '172.174.212.183', '172.174.212.248']
 
-copy_files(servers2, 'gp_scenarios_early_stop', 100, 2)
-#combine_files('gp_scenarios4')
+copy_files(servers, 'gp_scenarios_mtd', 100, 2)
+combine_files('gp_scenarios_mtd')
 #combine_files_ratios('gp_ratios_small_separate')
 #combine_files_sample_sizes('gp_sample_size')
 # combine_files_crm('crm_ratios2')

@@ -244,6 +244,151 @@ def plot_synthetic_subgroup_curves(out_foldername, scenario, scenario_idx):
     plt.close()
 
 
+def opt_scenarios_plot(out_foldername, ei_filename, ucb_filename, util_filename, metric):
+    ei_frame = pd.read_csv(ei_filename, index_col=0)
+    ei_melt = pd.melt(ei_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    ei_melt['method'] = 'EI'
+
+    ucb_frame = pd.read_csv(ucb_filename, index_col=0)
+    ucb_melt = pd.melt(ucb_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    ucb_melt['method'] = 'UCB'
+
+    util_frame = pd.read_csv(util_filename, index_col=0)
+    util_melt = pd.melt(util_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    util_melt['method'] = 'Utility'
+
+    frame = pd.concat([ei_melt, ucb_melt, util_melt])
+    frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
+
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(4.5, 8))
+    frame = frame[frame['index'] != 'overall']
+    frame['index'] = frame['index'].apply(lambda val: int(float(val)))
+
+    fig = sns.pointplot(data=frame, x=metric, y='scenario', hue='method', markers=['*','P', '.'],
+                        capsize=0.4, errwidth=1.5, scale=0.9, join=False)
+
+    #fig.set(xlabel=None, ylabel=None, xlim=(-0.1, 1.1), ylim=(-0.5, 17.5))
+    fig.set(xlabel=None, ylabel=None, xlim=(-0.75, 0.75), ylim=(-0.5, 17.5))
+    # plt.legend()
+    # plt.legend([],[], frameon=False)
+    plt.tick_params(
+        axis='both',         # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=False, # labels along the bottom edge are off
+        left=False,
+        labelleft=False
+    )
+    plt.savefig(f"{out_foldername}/{metric}_opt_comparison.png", bbox_inches="tight", pad_inches=0, dpi=500)
+
+def components_scenarios_plot(out_foldername, og_filename, mtd_filename, no_exp_filename,
+                              unconstrained_filename, sep_filename, one_filename, metric):
+    og_frame = pd.read_csv(og_filename, index_col=0)
+    og_melt = pd.melt(og_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    og_melt['method'] = 'SAFE-T'
+
+    mtd_frame = pd.read_csv(mtd_filename, index_col=0)
+    mtd_melt = pd.melt(mtd_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    mtd_melt['method'] = 'MTD'
+
+    no_exp_frame = pd.read_csv(no_exp_filename, index_col=0)
+    no_exp_melt = pd.melt(no_exp_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    no_exp_melt['method'] = 'No-Exp'
+
+    unconstrained_frame = pd.read_csv(unconstrained_filename, index_col=0)
+    unconstrained_melt = pd.melt(unconstrained_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    unconstrained_melt['method'] = 'Unconstrained'
+
+    sep_frame = pd.read_csv(sep_filename, index_col=0)
+    sep_melt = pd.melt(sep_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    sep_melt['method'] = 'Sep'
+
+    one_frame = pd.read_csv(one_filename, index_col=0)
+    one_melt = pd.melt(one_frame.reset_index(), id_vars='index', var_name='scenario', value_name=metric)
+    one_melt['method'] = 'One'
+
+    #frame = pd.concat([og_melt, sep_melt, one_melt])
+    #frame = pd.concat([og_melt, no_exp_melt, unconstrained_melt])
+    frame = pd.concat([og_melt, mtd_melt])
+    frame['scenario'] = frame['scenario'].apply(lambda val: val[8:])
+
+    sns.set_style("whitegrid")
+    plt.figure(figsize=(4.5, 8))
+    frame = frame[frame['index'] != 'overall']
+    frame['index'] = frame['index'].apply(lambda val: int(float(val)))
+
+    # palette = sns.color_palette()
+    # print(palette)
+    # newp = [palette[0], palette[2], palette[3]]
+    # palette = sns.color_palette("colorblind")
+    palette = sns.color_palette()
+    fig = sns.pointplot(data=frame, x=metric, y='scenario', hue='method', 
+                        capsize=0.4, errwidth=1.5, scale=0.9, join=False)
+
+    fig.set(xlabel=None, ylabel=None, xlim=(-0.1, 1.1), ylim=(-0.5, 17.5))
+    if metric == "utility":
+        fig.set(xlabel=None, ylabel=None, xlim=(-0.75, 0.75), ylim=(-0.5, 17.5))
+    # plt.legend()
+    # plt.legend([],[], frameon=False)
+    plt.tick_params(
+        axis='both',         # changes apply to the x-axis
+        which='both',      # both major and minor ticks are affected
+        bottom=False,      # ticks along the bottom edge are off
+        top=False,         # ticks along the top edge are off
+        labelbottom=False, # labels along the bottom edge are off
+        left=False,
+        labelleft=False
+    )
+    plt.savefig(f"{out_foldername}/{metric}_components_mtd.png", bbox_inches="tight", pad_inches=0, dpi=500)
+    plt.close()
+
+def ratios_plot(out_foldername, og_filename, sep_filename, one_filename, metric):
+    test_ratios = np.arange(0.15, 0.9, 0.05)
+    test_ratios = np.array([round(ratio, 2) for ratio in test_ratios]).astype(str)
+    sns.set_style("white")
+
+    og_frame = pd.read_csv(og_filename, index_col=0)
+    og_frame.columns = og_frame.columns
+    og_frame = og_frame[test_ratios]
+    og_frame.columns = test_ratios
+    
+    og_melt = pd.melt(og_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name=metric)
+    og_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    og_melt['method'] = 'SAFE-T'
+
+    sep_frame = pd.read_csv(sep_filename, index_col=0)
+    sep_frame.columns = sep_frame.columns
+    sep_frame = sep_frame[test_ratios]
+    sep_frame.columns = test_ratios
+    
+    sep_melt = pd.melt(sep_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name=metric)
+    sep_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    sep_melt['method'] = 'Sep'
+
+    one_frame = pd.read_csv(one_filename, index_col=0)
+    one_frame.columns = one_frame.columns
+    one_frame = one_frame[test_ratios]
+    one_frame.columns = test_ratios
+    
+    one_melt = pd.melt(one_frame.reset_index(), id_vars='index', var_name='subgroup_ratio', value_name=metric)
+    one_melt.rename({'index': 'subgroup', 'scenario': 'subgroup_ratio'})
+    one_melt['method'] = 'One'
+
+    # frame = pd.concat([og_melt, sep_melt, one_melt])
+    frame = pd.concat([og_melt, sep_melt])
+    frame['index'] = frame['index'].apply(lambda val: str(int(float(val))) if val != 'overall' else 'overall')
+    frame = frame.reset_index()
+    frame = frame[frame['index'] != 'overall']
+
+    sns.lineplot(data=frame, x='subgroup_ratio', y=metric, style='index', hue='method', linewidth=2)
+    plt.legend([],[], frameon=False)
+    plt.savefig(f"{out_foldername}/ratios_component_model_{metric}.png", dpi=500)
+    plt.close()
+
+
+
 scenarios = {
     1: DoseFindingScenarios.paper_example_1(),
     2: DoseFindingScenarios.paper_example_2(),
@@ -279,7 +424,44 @@ continuous_scenarios = {
 # for idx, scenario in scenarios.items():
 #     plot_synthetic_subgroup_curves("results/appendix_figs", scenario, idx)
 
-for idx, scenario in continuous_scenarios.items():
-    plot_synthetic_subgroup_curves("results/appendix_figs/continuous", scenario, idx)
+plot_synthetic_subgroup_curves("results/appendix_figs", scenarios[8], 8)
+
+# for idx, scenario in continuous_scenarios.items():
+#     plot_synthetic_subgroup_curves("results/appendix_figs/continuous", scenario, idx)
 
 # scenario.plot_true_subgroup_curves_paper_fig("results/comparison_plots/fig1_scen1.png")
+
+# ei_filename = "results/gp_scenarios4/final_dose_error.csv"
+# ucb_filename = "results/gp_scenarios_ucb/final_dose_error.csv"
+# util_filename = "results/gp_scenarios_util/final_dose_error.csv"
+# opt_scenarios_plot("results/appendix_figs/optimization", ei_filename, ucb_filename, util_filename, 'dose_error')
+
+# ei_filename = "results/gp_scenarios4/safety_violations.csv"
+# ucb_filename = "results/gp_scenarios_ucb/safety_violations.csv"
+# util_filename = "results/gp_scenarios_util/safety_violations.csv"
+# opt_scenarios_plot("results/appendix_figs/optimization", ei_filename, ucb_filename, util_filename, 'safety_violations')
+
+# ei_filename = "results/gp_scenarios4/utility.csv"
+# ucb_filename = "results/gp_scenarios_ucb/utility.csv"
+# util_filename = "results/gp_scenarios_util/utility.csv"
+# opt_scenarios_plot("results/appendix_figs/optimization", ei_filename, ucb_filename, util_filename, 'utility')
+
+
+# metrics = ["final_dose_error", "safety_violations", "utility"]
+# for metric in metrics:
+#     og_filename = f"results/gp_scenarios4/{metric}.csv"
+#     mtd_filename = f"results/gp_scenarios_mtd/{metric}.csv" # TODO: replace with real one
+#     no_exp_filename = f"results/gp_scenarios_no_expansion/{metric}.csv"
+#     unconstrained_filename = f"results/gp_scenarios_unconstrained/{metric}.csv"
+#     sep_filename = f"results/gp_scenarios_separate/{metric}.csv"
+#     one_filename = f"results/gp_scenarios_one_model/{metric}.csv"
+#     components_scenarios_plot("results/appendix_figs/components", og_filename, mtd_filename, no_exp_filename,
+#                                 unconstrained_filename, sep_filename, one_filename, metric)
+
+
+
+# for metric in metrics:
+#     og_filename = f"results/gp_ratios_small/{metric}.csv"
+#     sep_filename = f"results/gp_ratios_small_separate/{metric}.csv"
+#     one_filename = f"results/gp_ratios_small_separate/{metric}.csv"
+#     ratios_plot("results/appendix_figs/components", og_filename, sep_filename, one_filename, metric)
