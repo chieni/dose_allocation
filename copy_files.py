@@ -5,6 +5,7 @@ import numpy as np
 
 
 password = ''
+username = ''
 def copy_files(servers, folder_name, num_trials, num_subgroups):
     folders = [folder_name for idx in range(len(servers))]
 
@@ -19,7 +20,7 @@ def copy_files(servers, folder_name, num_trials, num_subgroups):
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
         # Connect to the server
-        client.connect(hostname=server_name, username='ic390', password=password)
+        client.connect(hostname=server_name, username=username, password=password)
 
         # Create an SFTP client
         sftp = client.open_sftp()
